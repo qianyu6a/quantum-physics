@@ -1822,6 +1822,24 @@ let translations = {"planck": {"problem": "In 1900, physics basked in optimism �
     timeline.appendChild(item);
   });
 }
+function rebuildConcepts() {
+  const tree = document.getElementById('tree');
+  const content = document.getElementById('content');
+  concepts.forEach(c => {
+    const node = document.createElement('div');
+    node.className = 'tree-node';
+    node.innerHTML = `<div class="tree-label" data-id="${c.id}"><span class="icon">${c.icon}</span><span>${c.title}</span><span class="num">${c.num}</span></div>`;
+    node.querySelector('.tree-label').onclick = () => showConcept(c.id);
+    tree.appendChild(node);
+
+    const sec = document.createElement('div');
+    sec.className = 'section';
+    sec.id = `sec-${c.id}`;
+    sec.innerHTML = `<div class="section-header"><div class="year">${c.year}</div><h2>${c.num}. ${c.title}</h2><div class="tagline">${c.tagline}</div></div><div class="tag-row"><span class="tag ${c.tag}">${c.tag === 'root' ? '基础概念' : '进阶理论'}</span></div><div class="callout accent"><strong>🤔 问题：</strong>${c.problem}</div><div class="concept-block"><h3>💡 关键洞察</h3><p>${c.insight}</p></div><div class="callout purple"><strong>🌌 大局观：</strong>${c.bigpic}</div><div class="canvas-container"><canvas id="${c.canvasId}"></canvas><div class="canvas-label">交互可视化</div><div class="canvas-hint">💡 点击/滑动 交互</div></div>`;
+    content.appendChild(sec);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', buildHomePage);
 </script>
 
