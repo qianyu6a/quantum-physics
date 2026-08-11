@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量子物理交互科普 | 从紫外灾难到标准模型</title>
+<style>
+:root {
+  --bg: #080c14; --surface: #0f1624; --surface2: #141e30;
+  --border: rgba(0,180,216,0.12); --accent: #00b4d8; --accent2: #7209b7;
+  --fg: #e0e8f0; --muted: #8899aa; --faint: #3a4a60;
+  --pink: #f72585; --gold: #f4a261; --green: #2ec4b6;
+  --radius: 10px; --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--fg); font-family:var(--font); height:100vh; display:flex; overflow:hidden; }
+
+/* Sidebar */
+.sidebar {
+  width:260px; min-width:260px; background:var(--surface);
+  border-right:1px solid var(--border); display:flex; flex-direction:column;
+  overflow-y:auto; z-index:10;
+}
+.sidebar-header {
+  padding:20px 16px 12px; border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg, rgba(0,180,216,0.05) 0%, transparent 100%);
+}
+.sidebar-header h1 { font-size:15px; color:var(--accent); letter-spacing:1px; }
+.sidebar-header p { font-size:10px; color:var(--muted); margin-top:4px; }
+.tree { padding:4px 0; }
+.tree-node { user-select:none; }
+.tree-label {
+  display:flex; align-items:center; gap:8px; padding:8px 16px;
+  cursor:pointer; font-size:13px; color:var(--fg); transition:all .15s;
+  border-left:2px solid transparent;
+}
+.tree-label:hover { background:var(--surface2); }
+.tree-label.active {
+  background:var(--surface2); border-left:2px solid var(--accent);
+  color:var(--accent);
+}
+.tree-label .icon { font-size:11px; width:16px; text-align:center; flex-shrink:0; }
+.tree-label .num {
+  font-size:10px; color:var(--faint); min-width:18px; text-align:right;
+}
+.tree-label.active .num { color:var(--accent); }
+
+/* Content */
+.content {
+  flex:1; overflow-y:auto; padding:36px 44px 60px;
+  scroll-behavior:smooth;
+}
+.content::-webkit-scrollbar { width:5px; }
+.content::-webkit-scrollbar-track { background:transparent; }
+.content::-webkit-scrollbar-thumb { background:var(--faint); border-radius:3px; }
+
+.section { display:none; animation:fadeIn .3s ease; }
+.section.active { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+.section-header { margin-bottom:24px; }
+.section-header h2 { font-size:26px; color:var(--fg); margin-bottom:4px; }
+.section-header .year { font-size:12px; color:var(--accent); letter-spacing:2px; }
+.section-header .tagline { font-size:13px; color:var(--muted); margin-top:6px; line-height:1.6; }
+
+/* Concept card */
+.concept-block { margin:24px 0; }
+.concept-block h3 { font-size:15px; color:var(--accent); margin-bottom:8px; }
+.concept-block p { font-size:14px; line-height:1.8; color:var(--muted); margin-bottom:10px; }
+.concept-block .highlight { color:var(--fg); font-weight:500; }
+
+.callout {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px 20px; margin:16px 0; font-size:13px; line-height:1.7;
+}
+.callout.accent { border-left:3px solid var(--accent); }
+.callout.purple { border-left:3px solid var(--accent2); }
+.callout.gold { border-left:3px solid var(--gold); }
+.callout.green { border-left:3px solid var(--green); }
+
+/* Canvas container */
+.canvas-container {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  margin:20px 0; overflow:hidden; position:relative;
+}
+.canvas-container canvas { display:block; width:100%; }
+.canvas-container .canvas-label {
+  position:absolute; top:10px; right:14px; font-size:10px;
+  color:var(--faint); letter-spacing:1px;
+}
+.canvas-container .canvas-hint {
+  position:absolute; bottom:10px; left:14px; font-size:10px;
+  color:var(--faint); opacity:0.7;
+}
+
+/* Tags */
+.tag-row { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }
+.tag {
+  font-size:10px; padding:3px 10px; border-radius:12px; letter-spacing:0.5px; font-weight:600;
+}
+.tag.root { background:rgba(0,180,216,0.15); color:var(--accent); }
+.tag.quantum { background:rgba(247,37,133,0.15); color:var(--pink); }
+
+/* Back to top */
+.back-top {
+  position:fixed; bottom:24px; right:24px; z-index:100;
+  width:40px; height:40px; border-radius:50%; background:var(--accent);
+  color:var(--bg); border:none; font-size:18px; cursor:pointer;
+  opacity:0; transform:translateY(10px); transition:all .3s;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 20px rgba(0,180,216,0.3);
+}
+.back-top.visible { opacity:1; transform:translateY(0); }
+.back-top:hover { transform:scale(1.1); }
+
+/* Mobile */
+@media (max-width:768px) {
+  body { flex-direction:column; }
+  .sidebar {
+    width:100%; min-width:100%; max-height:50px; overflow:hidden;
+    border-right:none; border-bottom:1px solid var(--border);
+    transition:max-height .3s;
+  }
+  .sidebar.open { max-height:60vh; overflow-y:auto; }
+  .sidebar-header { padding:12px 16px 8px; cursor:pointer; }
+  .sidebar-header::after { content:' ☰'; font-size:14px; color:var(--accent); float:right; }
+  .content { padding:20px 16px 40px; }
+  .section-header h2 { font-size:21px; }
+  .back-top { bottom:16px; right:16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header" onclick="document.getElementById('sidebar').classList.toggle('open')">
+    <h1>⚛️ 量子物理科普</h1>
+    <p>从紫外灾难到标准模型</p>
+  </div>
+  <div class="tree" id="tree"></div>
+</nav>
+
+<!-- Content -->
+<main class="content" id="content"></main>
+
+<button class="back-top" id="backTop" onclick="scrollToTop()">↑</button>
+
+<script>
+// ═══════════════════════════════════════
+// Data: 15 Quantum Concepts
+// ═══════════════════════════════════════
+const concepts = [
+  { id:'planck', num:1, title:'能量量子化', year:'1900 普朗克', icon:'🔸', tag:'root',
+    tagline:'能量不是连续的，是一份一份的。这是量子物理的开端。',
+    problem:'19世纪末，物理学家用经典理论计算黑体辐射，在紫外线波段得出无穷大能量——明显荒谬，被称为"紫外灾难"。',
+    insight:'普朗克被逼无奈，做了一个纯数学假设：物质发射和吸收辐射时，能量只能取某个最小单位的整数倍，E = hν（h是普朗克常数，ν是频率）。他自己都不相信这是物理真相，觉得只是个数学trick。',
+    bigpic:'这就像能量是一级一级的楼梯，你不能站在半级台阶上。日常世界中能量看起来连续，只是因为h太小了（6.626×10⁻³⁴ J·s），台阶密到你感觉不到。',
+    canvasId:'canvas-planck' },
+
+  { id:'photoelectric', num:2, title:'光量子 · 光电效应', year:'1905 爱因斯坦', icon:'💡', tag:'root',
+    tagline:'光不是连续的波，是一颗一颗的粒子——光子。',
+    problem:'光照在金属上会打出电子，但能不能打出来取决于光的频率，而不是亮度。红光再亮也打不出电子，紫光再弱也能打出来。经典波动理论完全无法解释。',
+    insight:'爱因斯坦提出：光是一颗颗的光子，每颗能量 E = hν。电子要脱离金属，需要光子能量超过"脱出功"。频率不够（能量不足），来再多光子也没用。',
+    bigpic:'就像用乒乓球砸玻璃——扔一万个也砸不碎。但一颗子弹就够了。这就是E = hν的含义：频率决定单颗光子的"威力"。',
+    canvasId:'canvas-photoelectric' },
+
+  { id:'bohr', num:3, title:'原子轨道量子化', year:'1913 玻尔', icon:'🪐', tag:'root',
+    tagline:'电子只能住在特定的"楼层"，不能待在中间地带。',
+    problem:'按经典电磁学，电子绕原子核旋转会不断辐射能量，应该很快坠毁在核上。但原子是稳定的——物质不会坍缩。',
+    insight:'玻尔假设：电子只能在特定轨道上运行，这些轨道对应特定的能量值。电子吸收或放出光子时，从一个轨道"跳"到另一个轨道，从不经过中间位置。',
+    bigpic:'电子住楼房——1楼、2楼、3楼，没有1.5楼。跃迁是瞬时的，不经过中间。这就解释了为什么每个元素有独特的光谱线。',
+    canvasId:'canvas-bohr' },
+
+  { id:'debroglie', num:4, title:'波粒二象性', year:'1924 德布罗意', icon:'🌊', tag:'root',
+    tagline:'所有物质都有波的属性——包括你。',
+    problem:'光既是波又是粒子。那电子呢？质子呢？德布罗意大胆推广：如果光波可以有粒子性，那粒子为什么不能有波动性？',
+    insight:'每个粒子都有一个"物质波"波长：λ = h / p（普朗克常数除以动量）。电子波长刚好和原子间距差不多，所以波动性很明显。你的波长太短了，短到日常感觉不到。',
+    bigpic:'你也是一种波——但波长只有 ~10⁻³⁶ 米，比原子核还小万亿倍，所以你在日常生活中完全感觉不到自己的"波性"。但电子在原子尺度，它的波性决定了整个化学。',
+    canvasId:'canvas-debroglie' },
+
+  { id:'uncertainty', num:5, title:'不确定性原理', year:'1927 海森堡', icon:'🎲', tag:'root',
+    tagline:'你不可能同时精确知道一个粒子的位置和速度。这不是测量技术的问题，是自然界的底层规律。',
+    problem:'在经典物理中，理论上测量可以无限精确。但量子力学说：位置和动量（质量×速度）是一对"共轭变量"，知道一个越精确，另一个就越模糊。',
+    insight:'Δx · Δp ≥ ℏ/2。不是因为你仪器不够好，而是粒子本身就没有"确定的位置和速度"这回事。它在测量之前处于叠加态——同时有好几个可能的位置。',
+    bigpic:'就像拍照：快门越快（时间精确），运动模糊越大（位置模糊）。但这不只是相机的问题——大自然自己就是用"概率云"来存储信息的。',
+    canvasId:'canvas-uncertainty' },
+
+  { id:'schrodinger', num:6, title:'薛定谔方程', year:'1926 薛定谔', icon:'📐', tag:'root',
+    tagline:'量子力学的"牛顿第二定律"——描述量子态如何随时间演化。',
+    problem:'玻尔的轨道模型虽然解释了光谱，但不能说明为什么只有特定轨道存在。需要一个更底层的方程。',
+    insight:'薛定谔写出了一个波动方程：粒子的状态用波函数 ψ 描述。ψ 本身看不到，但 |ψ|² 给出了在某个位置找到粒子的概率。方程精确预言了氢原子的所有能级。',
+    bigpic:'牛顿力学告诉你：球下一秒在坐标 (x,y,z)。量子力学告诉你：球下一秒在 (x,y,z) 的概率是 63%。不是我们不知道——是自然本身就只"承诺"了概率。',
+    canvasId:'canvas-schrodinger' },
+
+  { id:'dirac', num:7, title:'狄拉克方程 · 反物质', year:'1928 狄拉克', icon:'🪞', tag:'root',
+    tagline:'一个方程里藏着一个镜像世界——预言了反物质的存在。',
+    problem:'薛定谔方程不兼容相对论。狄拉克想写一个同时满足量子力学和相对论的方程。',
+    insight:'方程解出来，发现有一半解对应"负能量"——物理上似乎没意义。狄拉克没有扔掉它们，而是说：这些解不是bug，是预言——存在一种与电子质量相同但电荷相反的反粒子。1932年，正电子在实验中被发现。',
+    bigpic:'狄拉克方程像是一面镜子：每种粒子都有对应的反粒子。电子 ↔ 正电子，质子 ↔ 反质子。当物质和反物质相遇，100%的质量转化为能量（E=mc²）。',
+    canvasId:'canvas-dirac' },
+
+  { id:'qft', num:8, title:'量子场论 · QFT', year:'1930s-1950s', icon:'🌀', tag:'quantum',
+    tagline:'场才是根本，粒子只是场的涟漪。你看的每一个电子，都是同一个电子场的不同波浪。',
+    problem:'把粒子当作"小球"来描述越来越吃力。量子力学和相对论结合后，粒子的产生和湮灭需要新的数学框架。',
+    insight:'视角完全翻转：宇宙中充满了各种"场"——电子场、光子场、夸克场……粒子不是基本实体，而是这些场中的小波动。就像一个湖面，你看到的波纹不是独立存在的"东西"，而是水的运动。',
+    bigpic:'这意味着你看的每个电子，和太阳上的电子，是同一个"电子场"的不同位置泛起的涟漪。它们不是一个一个的小球，而是同一片海洋的不同波浪。',
+    canvasId:'canvas-qft' },
+
+  { id:'feynman', num:9, title:'费曼图 · QED', year:'1940s 费曼', icon:'📊', tag:'quantum',
+    tagline:'人类历史上最精确的物理理论——精确到小数点后12位。',
+    problem:'描述光和物质怎么互动的理论需要处理无穷多个可能的中间过程。费曼发明了一套图形语言把复杂的量子计算变成直观的"画图"。',
+    insight:'两束光照到一起不会互相弹开——光子和光子之间没有直接作用。但费曼图告诉你：它们极罕见地会——通过"虚拟"电子-正电子对间接互动。这就是量子涨落的可观测效应。',
+    bigpic:'QED（量子电动力学）预测的电子磁矩与实验测量一致到小数点后12位。相当于测量地球直径误差不超过一根头发丝。这是人类智慧最辉煌的成就之一。',
+    canvasId:'canvas-feynman' },
+
+  { id:'standard', num:10, title:'标准模型', year:'1960s-1970s', icon:'🧩', tag:'quantum',
+    tagline:'宇宙的"元素周期表"——目前关于物质的最完整答案。',
+    problem:'经过几十年，物理学家发现了大量基本粒子。需要一个统一的框架来组织它们。',
+    insight:'标准模型一共有17种基本粒子：6种夸克、6种轻子、4种传递力的粒子、1个希格斯玻色子。它精确预测了W/Z玻色子、顶夸克、希格斯玻色子的性质——后来全部被实验验证。',
+    bigpic:'但它不完美。它没包含引力，没解释暗物质和暗能量，中微子质量是后加的补丁。标准模型是物理学的最高成就，也是最豪华的"待装修房"。',
+    canvasId:'canvas-standard' },
+
+  { id:'higgs', num:11, title:'希格斯机制', year:'1964 / 实验 2012', icon:'🏊', tag:'quantum',
+    tagline:'整个宇宙浸泡在希格斯场里——有些粒子穿过它时会"拖泥带水"，这就是质量的来源。',
+    problem:'按对称性理论，W和Z玻色子应该是无质量的。但实验发现它们很重（约80-90 GeV）。质量从哪来？',
+    insight:'希格斯场弥漫整个宇宙，像一种看不见的糖浆。不同粒子与它耦合的强度不同——耦合越强，"拖"得越厉害，质量越大。光子不与希格斯场耦合，所以无质量，以光速前进。',
+    bigpic:'2012年7月4日，CERN宣布发现了希格斯玻色子——希格斯场的"涟漪"。83岁的彼得·希格斯在发布会上哭了。等了48年。',
+    canvasId:'canvas-higgs' },
+
+  { id:'entanglement', num:12, title:'量子纠缠 · 贝尔不等式', year:'1935 / 实验 1980s', icon:'🔗', tag:'quantum',
+    tagline:'两个纠缠粒子不管隔多远——测一个瞬间影响另一个。爱因斯坦说这不科学，结果他错了。',
+    problem:'量子力学说：纠缠粒子对的状态在被测量前不确定。爱因斯坦（EPR佯谬）反驳：肯定有"隐藏变量"我们没找到，粒子早就商量好了。',
+    insight:'1964年贝尔推导出一个不等式——如果存在隐藏变量，实验结果必须满足它。1980年代，阿斯佩的实验违反了贝尔不等式。爱因斯坦错了，量子力学真的是"鬼魅般的超距作用"。',
+    bigpic:'不是它们"商量好了"，而是它们根本没有独立存在过——纠缠意味着两个粒子共享同一个波函数。分开它们只是"切开同一个物体的不同位置"，本质还是一体。',
+    canvasId:'canvas-entanglement' },
+
+  { id:'qcd', num:13, title:'量子色动力学 · QCD', year:'1970s', icon:'🎨', tag:'quantum',
+    tagline:'夸克被永久禁闭——越狱的代价是立刻生一个新狱友。',
+    problem:'质子和中子里有夸克，但从来没有见过自由的夸克。为什么？',
+    insight:'强力的行为与电磁力截然相反——拉得越远，力越大。像一根橡皮筋，拉到足够长就崩断了，崩断时储存的能量转化为一对新的夸克-反夸克对。所以你永远只能看到夸克的"组合体"（强子）。',
+    bigpic:'夸克有三个"颜色"（红绿蓝）——不是真的颜色，是三种强荷。胶子在它们之间不断交换，把它们绑在一起。这就像三个囚犯被橡皮筋绑着——你拉其中一个，弹力只会更紧。',
+    canvasId:'canvas-qcd' },
+
+  { id:'string', num:14, title:'弦论', year:'1970s-至今', icon:'🎻', tag:'quantum',
+    tagline:'最美的万有理论候选者——所有粒子是同一根弦的不同振动。但没有实验证据。',
+    problem:'标准模型不能容纳引力。量子场论在处理引力时会得出无穷大。需要一种能统一所有力的理论。',
+    insight:'弦论说：所有基本粒子不是点，是微小到极致的弦。弦的不同振动模式对应不同粒子——就像吉他弦的不同振动发出不同音符。最神奇的是：方程里天然出现了引力子（引力载体），自动包含了引力。',
+    bigpic:'但代价很高：需要10或11维空间（多出来的卷曲在极微小尺度中），有10⁵⁰⁰种可能解（我们宇宙只是其中之一），而且没有任何实验证据。是美到窒息但可能是错的。',
+    canvasId:'canvas-string' },
+
+  { id:'quantum-computing', num:15, title:'量子计算', year:'1980s-至今', icon:'💻', tag:'quantum',
+    tagline:'经典计算机走迷宫一个一个岔路试，量子计算机所有岔路同时走。',
+    problem:'有些问题（因数分解、搜索、模拟量子系统）在经典计算机上需要宇宙寿命那么长才能算完。',
+    insight:'量子比特（qubit）利用叠加态：可以同时是0和1。N个qubit可以同时表示2^N个状态。量子门操作一次性处理所有可能状态——这就是量子并行的力量。',
+    bigpic:'50个qubit可以同时探索10¹⁵条计算路径。但要保持量子相干性极难——环境噪音会让qubit"退相干"，丢失量子信息。目前我们处于"含噪中等规模量子"（NISQ）时代，实用量子计算机还需要突破。',
+    canvasId:'canvas-qc' }
+];
+
+// ═══════════════════════════════════════
+// Build UI
+// ═══════════════════════════════════════
+const tree = document.getElementById('tree');
+const content = document.getElementById('content');
+let activeId = concepts[0].id;
+
+concepts.forEach(c => {
+  // Tree node
+  const node = document.createElement('div');
+  node.className = 'tree-node';
+  node.innerHTML = `<div class="tree-label" data-id="${c.id}">
+    <span class="icon">${c.icon}</span>
+    <span>${c.title}</span>
+    <span class="num">${c.num}</span>
+  </div>`;
+  node.querySelector('.tree-label').onclick = () => showConcept(c.id);
+  tree.appendChild(node);
+
+  // Content section
+  const sec = document.createElement('div');
+  sec.className = 'section';
+  sec.id = `sec-${c.id}`;
+  sec.innerHTML = `
+    <div class="section-header">
+      <div class="year">${c.year}</div>
+      <h2>${c.num}. ${c.title}</h2>
+      <div class="tagline">${c.tagline}</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag ${c.tag}">${c.tag === 'root' ? '基础概念' : '进阶理论'}</span>
+    </div>
+
+    <div class="callout accent">
+      <strong>🤔 问题：</strong>${c.problem}
+    </div>
+
+    <div class="concept-block">
+      <h3>💡 关键洞察</h3>
+      <p>${c.insight}</p>
+    </div>
+
+    <div class="callout purple">
+      <strong>🌌 大局观：</strong>${c.bigpic}
+    </div>
+
+    <div class="canvas-container">
+      <canvas id="${c.canvasId}"></canvas>
+      <div class="canvas-label">交互可视化</div>
+      <div class="canvas-hint">💡 点击/滑动 交互</div>
+    </div>
+  `;
+  content.appendChild(sec);
+});
+
+function showConcept(id) {
+  activeId = id;
+  document.querySelectorAll('.tree-label').forEach(l => l.classList.remove('active'));
+  document.querySelector(`[data-id="${id}"]`).classList.add('active');
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(`sec-${id}`).classList.add('active');
+  
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('open');
+  }
+  
+  // Trigger canvas redraw
+  setTimeout(() => initCanvas(id), 100);
+}
+
+// Init
+showConcept('planck');
+document.querySelector('.content').addEventListener('scroll', updateBackTop);
+window.addEventListener('scroll', updateBackTop);
+window.addEventListener('resize', () => {
+  updateBackTop();
+  setTimeout(() => initCanvas(activeId), 200);
+});
+
+// Back to top
+const backTop = document.getElementById('backTop');
+function scrollToTop() {
+  const c = document.querySelector('.content');
+  if (window.innerWidth <= 768) {
+    window.scrollTo({top:0, behavior:'smooth'});
+  } else {
+    c.scrollTo({top:0, behavior:'smooth'});
+  }
+}
+function updateBackTop() {
+  const c = document.querySelector('.content');
+  const sy = window.innerWidth <= 768 ? window.scrollY : c.scrollTop;
+  backTop.classList.toggle('visible', sy > 300);
+}
+
+// ═══════════════════════════════════════
+// Canvas System
+// ═══════════════════════════════════════
+const canvases = {};
+
+function initCanvas(id) {
+  const c = concepts.find(x => x.id === id);
+  if (!c) return;
+  const canvas = document.getElementById(c.canvasId);
+  if (!canvas) return;
+  
+  const container = canvas.parentElement;
+  const w = container.clientWidth;
+  const h = Math.min(380, w * 0.65);
+  canvas.width = w * 2;
+  canvas.height = h * 2;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+  
+  // Store for animation
+  canvases[id] = { ctx, w, h, canvas, frame:0 };
+  
+  // Start animation
+  drawCanvas(id);
+}
+
+function drawCanvas(id) {
+  const state = canvases[id];
+  if (!state) return;
+  state.frame++;
+  
+  const { ctx, w, h } = state;
+  ctx.clearRect(0, 0, w, h);
+  
+  switch(id) {
+    case 'planck': drawPlanck(ctx, w, h, state.frame); break;
+    case 'photoelectric': drawPhotoelectric(ctx, w, h, state.frame); break;
+    case 'bohr': drawBohr(ctx, w, h, state.frame); break;
+    case 'debroglie': drawDeBroglie(ctx, w, h, state.frame); break;
+    case 'uncertainty': drawUncertainty(ctx, w, h, state.frame); break;
+    case 'schrodinger': drawSchrodinger(ctx, w, h, state.frame); break;
+    case 'dirac': drawDirac(ctx, w, h, state.frame); break;
+    case 'qft': drawQFT(ctx, w, h, state.frame); break;
+    case 'feynman': drawFeynman(ctx, w, h, state.frame); break;
+    case 'standard': drawStandard(ctx, w, h, state.frame); break;
+    case 'higgs': drawHiggs(ctx, w, h, state.frame); break;
+    case 'entanglement': drawEntanglement(ctx, w, h, state.frame); break;
+    case 'qcd': drawQCD(ctx, w, h, state.frame); break;
+    case 'string': drawString(ctx, w, h, state.frame); break;
+    case 'qc': drawQC(ctx, w, h, state.frame); break;
+  }
+  
+  requestAnimationFrame(() => drawCanvas(id));
+}
+
+// Helper: draw text with glow
+function glowText(ctx, text, x, y, color, size=13) {
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = color;
+  ctx.font = `${size}px ${getComputedStyle(document.body).fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// Helper: gradient line
+function gradientLine(ctx, x1, y1, x2, y2, c1, c2) {
+  const g = ctx.createLinearGradient(x1, y1, x2, y2);
+  g.addColorStop(0, c1);
+  g.addColorStop(1, c2);
+  ctx.strokeStyle = g;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+// ═══════════════════════════════════════
+// Canvas Drawing Functions
+// ═══════════════════════════════════════
+
+function drawPlanck(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  // Energy ladder
+  const levels = 12;
+  const stepH = h * 0.6 / levels;
+  const startY = h * 0.8;
+  
+  for (let i = 0; i < levels; i++) {
+    const y = startY - i * stepH;
+    const alpha = 0.3 + 0.7 * (i / levels);
+    ctx.strokeStyle = `rgba(0,180,216,${alpha})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(w*0.2, y);
+    ctx.lineTo(w*0.8, y);
+    ctx.stroke();
+    
+    // Energy label
+    ctx.fillStyle = `rgba(136,153,170,${alpha})`;
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${i}hν`, w*0.18, y+4);
+  }
+  
+  // Particle bouncing
+  const particleY = startY - (t*0.02 % levels) * stepH - stepH/2;
+  ctx.fillStyle = '#f72585';
+  ctx.shadowColor = '#f72585';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(cx, particleY, 8, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  
+  // Title
+  glowText(ctx, '能量 = hν × n', cx, h*0.12, '#00b4d8', 16);
+  glowText(ctx, '能量必须取整数倍', cx, h*0.19, '#8899aa', 12);
+}
+
+function drawPhotoelectric(ctx, w, h, t) {
+  const cx = w/2;
+  // Metal surface
+  ctx.fillStyle = '#3a4a60';
+  ctx.fillRect(w*0.1, h*0.75, w*0.8, 4);
+  
+  // UV photons (purple, high energy) - hit from left
+  for (let i = 0; i < 4; i++) {
+    const px = w*0.15 + i*60 + (t*0.5 % 60);
+    const py = h*0.4 + Math.sin(t*0.05 + i)*15;
+    ctx.fillStyle = '#7209b7';
+    ctx.shadowColor = '#7209b7';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(px, py, 5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    // Arrow
+    ctx.strokeStyle = '#7209b7';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px-12, py-12);
+    ctx.stroke();
+  }
+  
+  // Electron ejected
+  const ex = cx + 40 + Math.sin(t*0.03)*30;
+  const ey = h*0.55 + (t*0.02 % 1)*20;
+  ctx.fillStyle = '#f4a261';
+  ctx.shadowColor = '#f4a261';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.arc(ex, ey, 6, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  
+  // Labels
+  glowText(ctx, '紫光 (高频率) → 打出电子', w*0.25, h*0.25, '#7209b7', 12);
+  glowText(ctx, '金属表面', w*0.5, h*0.72, '#8899aa', 11);
+  glowText(ctx, 'E = hν 决定能不能打出', cx, h*0.92, '#00b4d8', 13);
+}
+
+function drawBohr(ctx, w, h, t) {
+  const cx = w/2, cy = h*0.5;
+  const radii = [35, 60, 85, 115];
+  const colors = ['#00b4d8', '#7209b7', '#f72585', '#f4a261'];
+  
+  // Nucleus
+  ctx.fillStyle = '#f72585';
+  ctx.shadowColor = '#f72585';
+  ctx.shadowBlur = 20;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 8, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  
+  // Orbits
+  radii.forEach((r, i) => {
+    ctx.strokeStyle = colors[i];
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    
+    // Electron
+    const angle = t*0.03 + i*1.2;
+    const ex = cx + r * Math.cos(angle);
+    const ey = cy + r * Math.sin(angle);
+    ctx.fillStyle = colors[i];
+    ctx.shadowColor = colors[i];
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(ex, ey, 5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+  
+  // Photon jump
+  const jumpT = (t*0.01 % 1);
+  if (jumpT < 0.3) {
+    const alpha = 1 - jumpT/0.3;
+    ctx.strokeStyle = `rgba(0,180,216,${alpha})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.moveTo(cx + radii[2]*0.7, cy - radii[2]*0.7);
+    ctx.quadraticCurveTo(cx + 70, cy - 90, cx + radii[0]*0.7, cy - radii[0]*0.7);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  
+  glowText(ctx, 'n=1', cx + radii[0] + 15, cy - 3, '#00b4d8', 10);
+  glowText(ctx, 'n=2', cx + radii[1] + 15, cy - 3, '#7209b7', 10);
+  glowText(ctx, 'n=3', cx + radii[2] + 15, cy - 3, '#f72585', 10);
+  glowText(ctx, 'n=4', cx + radii[3] + 15, cy - 3, '#f4a261', 10);
+  glowText(ctx, '核', cx, cy, '#f72585', 9);
+  glowText(ctx, '跃迁释放光子 hν = ΔE', w*0.7, h*0.15, '#00b4d8', 11);
+}
+
+function drawDeBroglie(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Wave
+  ctx.strokeStyle = '#00b4d8';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#00b4d8';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  for (let x = 0; x < w; x += 2) {
+    const y = cy + Math.sin(x*0.05 + t*0.05) * 80;
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  
+  // Particle riding the wave
+  const px = (t*0.8 % w);
+  const py = cy + Math.sin(px*0.05 + t*0.05) * 80;
+  ctx.fillStyle = '#f72585';
+  ctx.shadowColor = '#f72585';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(px, py, 7, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  
+  glowText(ctx, 'λ = h / p', cx, h*0.18, '#00b4d8', 16);
+  glowText(ctx, '每个粒子都是一列波', cx, h*0.85, '#8899aa', 13);
+}
+
+function drawUncertainty(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Position distribution (Gaussian)
+  const spread = 15 + Math.sin(t*0.03) * 12;
+  ctx.fillStyle = 'rgba(0,180,216,0.15)';
+  ctx.beginPath();
+  for (let x = cx-100; x <= cx+100; x += 2) {
+    const gauss = Math.exp(-((x-cx)*(x-cx))/(2*spread*spread));
+    const y = cy - gauss * 120;
+    if (x === cx-100) ctx.moveTo(x, cy);
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(cx+100, cy);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Position marker
+  ctx.strokeStyle = 'rgba(0,180,216,0.5)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx, cy-140);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  glowText(ctx, `Δx · Δp ≥ ℏ/2`, cx, h*0.12, '#00b4d8', 18);
+  glowText(ctx, '位置越确定 → 速度越不确定', cx, h*0.2, '#8899aa', 12);
+  glowText(ctx, `位置不确定度: ~${spread.toFixed(0)}`, cx+120, h*0.45, '#00b4d8', 10);
+}
+
+function drawSchrodinger(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Potential well
+  ctx.strokeStyle = '#3a4a60';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(w*0.15, h*0.85);
+  ctx.lineTo(w*0.25, h*0.85);
+  ctx.lineTo(w*0.25, h*0.25);
+  ctx.lineTo(w*0.75, h*0.25);
+  ctx.lineTo(w*0.75, h*0.85);
+  ctx.lineTo(w*0.85, h*0.85);
+  ctx.stroke();
+  
+  // Wave function inside well
+  const n = 3; // 3rd energy level
+  ctx.strokeStyle = '#f72585';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#f72585';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  const startX = w*0.25, endX = w*0.75;
+  for (let x = startX; x <= endX; x += 2) {
+    const normalized = (x-startX) / (endX-startX);
+    const wave = Math.sin(n * Math.PI * normalized) * 70;
+    const y = cy + 10 + wave;
+    if (x === startX) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  
+  // Probability |ψ|²
+  ctx.fillStyle = 'rgba(0,180,216,0.2)';
+  ctx.beginPath();
+  for (let x = startX; x <= endX; x += 2) {
+    const normalized = (x-startX) / (endX-startX);
+    const prob = Math.sin(n * Math.PI * normalized);
+    const probHeight = prob * prob * 80;
+    const yTop = cy + 10 - probHeight;
+    const yBot = cy + 10 + probHeight;
+    if (x === startX) ctx.moveTo(x, yTop);
+    ctx.lineTo(x, yBot);
+  }
+  ctx.closePath();
+  ctx.fill();
+  
+  // Labels
+  glowText(ctx, '|ψ|² = 概率密度', w*0.7, h*0.35, '#00b4d8', 11);
+  glowText(ctx, '波函数 ψ', w*0.35, h*0.4, '#f72585', 11);
+  glowText(ctx, '势阱', cx, h*0.9, '#8899aa', 11);
+  glowText(ctx, '薛定谔方程: iℏ ∂ψ/∂t = Ĥψ', cx, h*0.12, '#00b4d8', 15);
+}
+
+function drawDirac(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Dirac sea — sea of negative energy
+  const seaY = h*0.65;
+  ctx.fillStyle = 'rgba(0,180,216,0.08)';
+  ctx.beginPath();
+  for (let x = 0; x < w; x += 4) {
+    const wave = Math.sin(x*0.03 + t*0.02) * 8;
+    if (x === 0) ctx.moveTo(x, seaY + wave);
+    ctx.lineTo(x, seaY + 15 + wave);
+  }
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.fill();
+  
+  ctx.fillStyle = 'rgba(136,153,170,0.5)';
+  ctx.font = '11px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText('狄拉克之海 (负能量)', w*0.05, seaY - 5);
+  
+  // Electron (positive energy)
+  const ex = w*0.4 + Math.sin(t*0.04)*20;
+  const ey = h*0.35;
+  ctx.fillStyle = '#00b4d8';
+  ctx.shadowColor = '#00b4d8';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(ex, ey, 7, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  glowText(ctx, '电子 e⁻ (+E)', ex, ey - 18, '#00b4d8', 10);
+  
+  // Hole = positron
+  const hx = w*0.6 + Math.cos(t*0.04)*20;
+  const hy = seaY - 8;
+  ctx.strokeStyle = '#f72585';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4,3]);
+  ctx.beginPath();
+  ctx.arc(hx, hy, 10, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(247,37,133,0.2)';
+  ctx.beginPath();
+  ctx.arc(hx, hy, 10, 0, Math.PI*2);
+  ctx.fill();
+  glowText(ctx, '空穴 = 正电子 e⁺', hx, hy - 20, '#f72585', 10);
+  
+  // Mirror line
+  ctx.strokeStyle = 'rgba(58,74,96,0.5)';
+  ctx.setLineDash([2,6]);
+  ctx.beginPath();
+  ctx.moveTo(w*0.1, cy);
+  ctx.lineTo(w*0.9, cy);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  glowText(ctx, '--- E=0 ---', w*0.9, cy-5, '#3a4a60', 9);
+  
+  glowText(ctx, '狄拉克方程: (iγ^μ ∂_μ - m)ψ = 0', cx, h*0.1, '#00b4d8', 14);
+  glowText(ctx, '一个方程，一个镜像世界', cx, h*0.9, '#8899aa', 12);
+}
+
+function drawQFT(ctx, w, h, t) {
+  // Ocean of field with ripples
+  const cx = w/2;
+  const seaLevel = h*0.55;
+  
+  // Background sea
+  ctx.fillStyle = 'rgba(0,180,216,0.05)';
+  ctx.fillRect(0, seaLevel - 30, w, h - seaLevel + 30);
+  
+  // Field surface
+  ctx.strokeStyle = '#00b4d8';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#00b4d8';
+  ctx.shadowBlur = 4;
+  ctx.beginPath();
+  for (let x = 0; x < w; x += 2) {
+    let y = seaLevel;
+    // Multiple ripples
+    y += Math.sin(x*0.02 + t*0.03) * 15;
+    y += Math.sin(x*0.05 - t*0.04) * 8;
+    y += Math.sin(x*0.08 + t*0.06) * 4;
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  
+  // Excitations (particles)
+  for (let i = 0; i < 5; i++) {
+    const px = w*0.15 + i*w*0.18;
+    const py = seaLevel + Math.sin(px*0.03 + t*0.04 + i)*15 - 20;
+    const alpha = 0.3 + 0.7*(i/5);
+    ctx.fillStyle = `rgba(247,37,133,${alpha})`;
+    ctx.shadowColor = `rgba(247,37,133,${alpha})`;
+    ctx.shadowBlur = 10*alpha;
+    ctx.beginPath();
+    ctx.arc(px, py, 5*alpha, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  
+  glowText(ctx, '场是海洋，粒子是涟漪', cx, h*0.18, '#00b4d8', 16);
+  glowText(ctx, '量子场论 (QFT)', cx, h*0.85, '#8899aa', 13);
+}
+
+function drawFeynman(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Electron lines
+  ctx.strokeStyle = '#00b4d8';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(w*0.1, h*0.2);
+  ctx.lineTo(cx - 30, cy - 20);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - 30, cy - 20);
+  ctx.lineTo(w*0.9, h*0.2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(w*0.1, h*0.8);
+  ctx.lineTo(cx - 30, cy + 20);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - 30, cy + 20);
+  ctx.lineTo(w*0.9, h*0.8);
+  ctx.stroke();
+  
+  // Photon exchange (wavy)
+  ctx.strokeStyle = '#f4a261';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath();
+  ctx.moveTo(cx - 30, cy - 20);
+  ctx.lineTo(cx - 30, cy + 20);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Labels
+  glowText(ctx, 'e⁻', w*0.08, h*0.17, '#00b4d8', 12);
+  glowText(ctx, 'e⁻', w*0.08, h*0.83, '#00b4d8', 12);
+  glowText(ctx, 'e⁻', w*0.92, h*0.17, '#00b4d8', 12);
+  glowText(ctx, 'e⁻', w*0.92, h*0.83, '#00b4d8', 12);
+  glowText(ctx, 'γ (光子)', cx - 60, cy, '#f4a261', 11);
+  glowText(ctx, '费曼图: 两个电子交换一个光子', cx, h*0.92, '#8899aa', 13);
+}
+
+function drawStandard(ctx, w, h, t) {
+  const cx = w/2;
+  const cols = 4;
+  const cellW = w / (cols + 1);
+  const cellH = 50;
+  const startY = h*0.12;
+  
+  const particles = [
+    ['u','c','t','g'],
+    ['d','s','b','γ'],
+    ['e','μ','τ','Z'],
+    ['νₑ','ν_μ','ν_τ','W'],
+    ['','','','H']
+  ];
+  const names = [
+    ['上夸克','粲夸克','顶夸克','胶子'],
+    ['下夸克','奇夸克','底夸克','光子'],
+    ['电子','μ子','τ子','Z玻色子'],
+    ['电中微子','μ中微子','τ中微子','W玻色子'],
+    ['','','','希格斯']
+  ];
+  const types = [
+    ['q','q','q','g'],
+    ['q','q','q','g'],
+    ['l','l','l','g'],
+    ['l','l','l','g'],
+    ['','','','h']
+  ];
+  
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 4; col++) {
+      if (row === 4 && col < 3) continue;
+      const x = (col + 1) * cellW;
+      const y = startY + row * (cellH + 8);
+      const type = types[row][col];
+      
+      let bgColor = 'rgba(0,180,216,0.1)';
+      if (type === 'q') bgColor = 'rgba(247,37,133,0.1)';
+      else if (type === 'l') bgColor = 'rgba(0,180,216,0.08)';
+      else if (type === 'g') bgColor = 'rgba(244,162,97,0.1)';
+      else if (type === 'h') bgColor = 'rgba(114,9,183,0.15)';
+      
+      ctx.fillStyle = bgColor;
+      ctx.strokeStyle = 'rgba(0,180,216,0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(x - cellW*0.4, y - cellH*0.35, cellW*0.8, cellH*0.8, 6);
+      ctx.fill();
+      ctx.stroke();
+      
+      ctx.fillStyle = '#e0e8f0';
+      ctx.font = 'bold 14px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(particles[row][col], x, y - 3);
+      
+      ctx.fillStyle = '#8899aa';
+      ctx.font = '9px system-ui';
+      ctx.fillText(names[row][col], x, y + 14);
+    }
+  }
+  
+  // Category labels
+  ctx.fillStyle = '#f72585';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'right';
+  ctx.fillText('夸克', w*0.08, startY + cellH*0.6);
+  ctx.fillText('轻子', w*0.08, startY + 2*cellH + cellH*0.6);
+  
+  ctx.fillStyle = '#f4a261';
+  ctx.fillText('玻色子', w*0.08, startY + 3*cellH + cellH*0.6);
+  
+  glowText(ctx, '标准模型 — 17种基本粒子', cx, h*0.03, '#00b4d8', 15);
+  glowText(ctx, '6夸克 + 6轻子 + 4力载体 + 1希格斯', cx, h*0.92, '#8899aa', 12);
+}
+
+function drawHiggs(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Higgs field — background "molasses"
+  for (let i = 0; i < 60; i++) {
+    const mx = (i*37 + t*0.3) % w;
+    const my = (i*53 + t*0.2) % h;
+    ctx.fillStyle = 'rgba(114,9,183,0.08)';
+    ctx.beginPath();
+    ctx.arc(mx, my, 2, 0, Math.PI*2);
+    ctx.fill();
+  }
+  
+  // Particles moving through
+  // Photon — zips through (no coupling)
+  const phx = (t*1.2 % w);
+  ctx.fillStyle = '#f4a261';
+  ctx.shadowColor = '#f4a261';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(phx, h*0.25, 5, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  glowText(ctx, '光子 (无质量)', phx + 40, h*0.22, '#f4a261', 9);
+  
+  // Electron — dragged (some coupling)
+  const ex = (t*0.4 % w);
+  const ey = h*0.55 + Math.sin(t*0.1)*5;
+  ctx.fillStyle = '#00b4d8';
+  ctx.shadowColor = '#00b4d8';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.arc(ex, ey, 6, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  glowText(ctx, '电子 (有质量)', ex + 40, ey - 10, '#00b4d8', 9);
+  
+  // Top quark — heavily dragged
+  const tx = (t*0.15 % w);
+  const ty = h*0.78 + Math.sin(t*0.05)*3;
+  ctx.fillStyle = '#f72585';
+  ctx.shadowColor = '#f72585';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(tx, ty, 8, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  glowText(ctx, '顶夸克 (很重)', tx + 45, ty - 10, '#f72585', 9);
+  
+  glowText(ctx, '希格斯场像糖浆——不同粒子穿过时受到的"阻力"不同', cx, h*0.08, '#7209b7', 14);
+  glowText(ctx, '阻力 = 质量', cx, h*0.92, '#8899aa', 13);
+}
+
+function drawEntanglement(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Two entangled particles
+  const p1x = w*0.2;
+  const p2x = w*0.8;
+  const py = cy;
+  
+  // Connection
+  const dashOffset = t*0.5 % 20;
+  ctx.strokeStyle = 'rgba(247,37,133,0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.lineDashOffset = -dashOffset;
+  ctx.beginPath();
+  ctx.moveTo(p1x + 20, py);
+  ctx.quadraticCurveTo(cx, py + 80, p2x - 20, py);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Particle 1
+  const p1Spin = Math.sin(t*0.06) > 0 ? '↑' : '↓';
+  ctx.fillStyle = '#00b4d8';
+  ctx.shadowColor = '#00b4d8';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(p1x, py, 12, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(p1Spin, p1x, py + 5);
+  glowText(ctx, '粒子A', p1x, py + 35, '#00b4d8', 11);
+  
+  // Particle 2
+  const p2Spin = p1Spin === '↑' ? '↓' : '↑';
+  ctx.fillStyle = '#f72585';
+  ctx.shadowColor = '#f72585';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(p2x, py, 12, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(p2Spin, p2x, py + 5);
+  glowText(ctx, '粒子B', p2x, py + 35, '#f72585', 11);
+  
+  glowText(ctx, '一个 ↑ → 另一个必定 ↓', cx, h*0.82, '#f72585', 14);
+  glowText(ctx, '不管隔多远——这是量子纠缠', cx, h*0.9, '#8899aa', 13);
+}
+
+function drawQCD(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Three quarks in a proton
+  const colors = ['#ff4444', '#44ff44', '#4444ff'];
+  const positions = [
+    { x: cx - 20 + Math.sin(t*0.03)*10, y: cy - 25 + Math.cos(t*0.04)*8 },
+    { x: cx + 30 + Math.cos(t*0.035)*8, y: cy - 20 + Math.sin(t*0.05)*10 },
+    { x: cx + 5 + Math.sin(t*0.04)*12, y: cy + 25 + Math.cos(t*0.03)*8 }
+  ];
+  
+  // Glue springs between quarks
+  positions.forEach((p, i) => {
+    const next = positions[(i+1)%3];
+    ctx.strokeStyle = `rgba(244,162,97,0.4)`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const tx = (p.x + next.x)/2, ty = (p.y + next.y)/2;
+    ctx.moveTo(p.x, p.y);
+    ctx.quadraticCurveTo(tx + Math.sin(t*0.06+i)*15, ty + Math.cos(t*0.06+i)*15, next.x, next.y);
+    ctx.stroke();
+  });
+  
+  // Quarks
+  positions.forEach((p, i) => {
+    ctx.fillStyle = colors[i];
+    ctx.shadowColor = colors[i];
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 10, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+  
+  // Rubber band analogy
+  const pullX = cx;
+  const pullY = cy - 90;
+  ctx.strokeStyle = '#f4a261';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3,5]);
+  ctx.beginPath();
+  ctx.moveTo(pullX, pullY);
+  ctx.lineTo(positions[0].x, positions[0].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  ctx.fillStyle = 'rgba(244,162,97,0.2)';
+  ctx.beginPath();
+  ctx.arc(pullX, pullY, 12, 0, Math.PI*2);
+  ctx.fill();
+  
+  glowText(ctx, '越拉越紧！', pullX + 30, pullY - 10, '#f4a261', 9);
+  glowText(ctx, '质子 (uud)', cx, h*0.82, '#00b4d8', 13);
+  glowText(ctx, '夸克禁闭——永远看不到自由的夸克', cx, h*0.9, '#8899aa', 12);
+}
+
+function drawString(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // A single string vibrating in different modes
+  const modes = 3;
+  const modeSpacing = h*0.5 / modes;
+  
+  for (let m = 0; m < modes; m++) {
+    const stringY = h*0.2 + m * modeSpacing + modeSpacing/2;
+    const amplitude = 20 - m*5;
+    
+    ctx.strokeStyle = m === 0 ? '#00b4d8' : m === 1 ? '#f72585' : '#f4a261';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    
+    const freq = m + 1;
+    for (let x = w*0.15; x <= w*0.85; x += 2) {
+      const normalized = (x - w*0.15) / (w*0.7);
+      const y = stringY + Math.sin(normalized * freq * Math.PI + t*0.04) * amplitude;
+      if (x === w*0.15) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    
+    // Labels
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'right';
+    const labels = ['电子', 'μ子', '顶夸克'];
+    ctx.fillText(labels[m], w*0.12, stringY + 4);
+  }
+  
+  glowText(ctx, '一根弦，三种振动 = 三种粒子', cx, h*0.08, '#00b4d8', 15);
+  glowText(ctx, '弦论: 所有粒子是同一根弦的不同"音符"', cx, h*0.92, '#8899aa', 12);
+}
+
+function drawQC(ctx, w, h, t) {
+  const cx = w/2, cy = h/2;
+  
+  // Bloch sphere representation
+  ctx.strokeStyle = 'rgba(136,153,170,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 80, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 80, 25, 0, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy-80);
+  ctx.lineTo(cx, cy+80);
+  ctx.stroke();
+  
+  // State vector
+  const angle = t*0.03;
+  const r = 75;
+  const sx = cx + r * Math.sin(angle) * Math.cos(angle*0.5);
+  const sy = cy - r * Math.cos(angle*0.5);
+  
+  ctx.strokeStyle = '#f72585';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#f72585';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(sx, sy);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  
+  ctx.fillStyle = '#f72585';
+  ctx.beginPath();
+  ctx.arc(sx, sy, 5, 0, Math.PI*2);
+  ctx.fill();
+  
+  // |0> and |1> labels
+  ctx.fillStyle = '#00b4d8';
+  ctx.font = '13px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('|0⟩', cx, cy - 92);
+  ctx.fillText('|1⟩', cx, cy + 100);
+  
+  // Superposition note
+  const cosA = Math.cos(angle*0.5);
+  const sinA = Math.sin(angle*0.5);
+  glowText(ctx, `|ψ⟩ = ${cosA.toFixed(2)}|0⟩ + ${sinA.toFixed(2)}|1⟩`, cx, h*0.88, '#f72585', 13);
+  glowText(ctx, '布洛赫球 — qubit 可以同时在 |0⟩ 和 |1⟩', cx, h*0.08, '#00b4d8', 13);
+}
+
+// ═══════════════════════════════════════
+// Init first canvas
+// ═══════════════════════════════════════
+setTimeout(() => initCanvas('planck'), 200);
+</script>
+</body>
+</html>
