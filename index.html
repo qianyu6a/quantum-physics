@@ -904,42 +904,84 @@ function drawBohr(ctx, w, h, t, st) {
 }
 
 function drawDeBroglie(ctx, w, h, t, st) {
-  const cx = w/2, cy = h/2;
+  // Initialize screen accumulator on first call
+  if (!st.screen) { st.screen = new Array(100).fill(0); st.particles = 0; st.slitSep = st.slitSep || 4; }
   
-  // Wave
-  ctx.strokeStyle = '#00b4d8';
-  ctx.lineWidth = 2;
-  ctx.shadowColor = '#00b4d8';
-  ctx.shadowBlur = 6;
-  ctx.beginPath();
-  for (let x = 0; x < w; x += 2) {
-    const y = cy + Math.sin(x*0.05 + t*0.05) * 80;
-    if (x === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  const slitY = h * 0.22, screenX = w * 0.75, barrierX = w * 0.3;
+  const slit1Y = slitY - st.slitSep * 8, slit2Y = slitY + st.slitSep * 8;
+  
+  // Fire particles periodically
+  if (t % 3 === 0 && st.particles < 600) {
+    st.particles++;
+    // Each particle goes through a random slit and lands according to interference pattern
+    const slit = Math.random() < 0.5 ? slit1Y : slit2Y;
+    // Simplified interference: probability peaks at positions where path difference = nλ
+    const relWavelength = st.slitSep * 0.15;
+    const baseScreenY = h * 0.15 + Math.random() * h * 0.7;
+    // Add interference modulation: cos² pattern
+    const screenIdx = Math.floor((baseScreenY - h*0.15) / (h*0.7) * 100);
+    const normalized = (screenIdx / 100 - 0.5) * 2; // -1 to 1
+    const interference = Math.pow(Math.cos(normalized * 8 * st.slitSep), 2);
+    // Probabilistic: more likely to land where interference is high
+    const adjusted = baseScreenY + (Math.random() - 0.5) * h * 0.3 * (1 - interference);
+    const idx = Math.max(0, Math.min(99, Math.floor((adjusted - h*0.15) / (h*0.7) * 100)));
+    if (idx >= 0 && idx < 100) st.screen[idx]++;
   }
-  ctx.stroke();
-  ctx.shadowBlur = 0;
   
-  // Particle riding the wave
-  const px = (t*0.8 % w);
-  const py = cy + Math.sin(px*0.05 + t*0.05) * 80;
+  // Draw barrier with slits
+  ctx.fillStyle = '#3a4a60';
+  ctx.fillRect(barrierX - 4, 0, 8, slit1Y - 16);
+  ctx.fillRect(barrierX - 4, slit1Y + 16, 8, slit2Y - slit1Y - 32);
+  ctx.fillRect(barrierX - 4, slit2Y + 16, 8, h - slit2Y - 16);
+  
+  // Slit labels
+  ctx.fillStyle = '#00b4d8';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'right';
+  ctx.fillText('缝 A', barrierX - 10, slit1Y + 4);
+  ctx.fillText('缝 B', barrierX - 10, slit2Y + 4);
+  
+  // Incoming particle
+  const px = barrierX - 40 - (t * 2 % 80);
   ctx.fillStyle = '#f72585';
   ctx.shadowColor = '#f72585';
-  ctx.shadowBlur = 15;
+  ctx.shadowBlur = 8;
   ctx.beginPath();
-  ctx.arc(px, py, 7, 0, Math.PI*2);
+  ctx.arc(px, slitY + Math.sin(t*0.5)*5, 4, 0, Math.PI*2);
   ctx.fill();
   ctx.shadowBlur = 0;
   
-  glowText(ctx, 'λ = h / p', cx, h*0.18, '#00b4d8', 16);
-  glowText(ctx, '每个粒子都是一列波', cx, h*0.85, '#8899aa', 13);
+  // Screen: accumulated hits
+  const barW = (screenX - barrierX) * 0.8 / 100;
+  const maxHits = Math.max(1, ...st.screen);
+  for (let i = 0; i < 100; i++) {
+    const alpha = st.screen[i] / maxHits;
+    ctx.fillStyle = `rgba(0,180,216,${0.1 + alpha * 0.9})`;
+    const x = barrierX + 30 + i * barW;
+    const barH = st.screen[i] / maxHits * h * 0.5;
+    ctx.fillRect(x, h*0.15 + h*0.7 - barH, barW*0.8, barH);
+  }
+  
+  // "Screen" line
+  ctx.strokeStyle = '#4a5a70';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(barrierX + 25, 0);
+  ctx.lineTo(barrierX + 25, h);
+  ctx.stroke();
+  
+  glowText(ctx, `粒子数: ${st.particles} | 缝距: ${st.slitSep}`, w*0.5, h*0.12, '#00b4d8', 14);
+  glowText(ctx, '双缝干涉 — 一个一个粒子积累出干涉条纹', w*0.5, h*0.92, '#8899aa', 11);
+  
+  // Reset button hint
+  if (st.particles >= 500) glowText(ctx, '点击"发射粒子"重置实验', w*0.5, h*0.82, '#f4a261', 10);
 }
 
 function drawUncertainty(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
-  // Position distribution (Gaussian)
-  const spread = 15 + Math.sin(t*0.03) * 12;
+  // Use state spread or auto-oscillate
+  const spread = st?.spread || 30;
   ctx.fillStyle = 'rgba(0,180,216,0.15)';
   ctx.beginPath();
   for (let x = cx-100; x <= cx+100; x += 2) {
@@ -969,8 +1011,7 @@ function drawUncertainty(ctx, w, h, t, st) {
 
 function drawSchrodinger(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
-  
-  // Potential well
+  const n = st?.n || 3;
   ctx.strokeStyle = '#3a4a60';
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -983,7 +1024,6 @@ function drawSchrodinger(ctx, w, h, t, st) {
   ctx.stroke();
   
   // Wave function inside well
-  const n = 3; // 3rd energy level
   ctx.strokeStyle = '#f72585';
   ctx.lineWidth = 2;
   ctx.shadowColor = '#f72585';
@@ -1016,7 +1056,7 @@ function drawSchrodinger(ctx, w, h, t, st) {
   ctx.fill();
   
   // Labels
-  glowText(ctx, '|ψ|² = 概率密度', w*0.7, h*0.35, '#00b4d8', 11);
+  glowText(ctx, `n=${n} |ψ|² = 概率密度`, w*0.7, h*0.35, '#00b4d8', 11);
   glowText(ctx, '波函数 ψ', w*0.35, h*0.4, '#f72585', 11);
   glowText(ctx, '势阱', cx, h*0.9, '#8899aa', 11);
   glowText(ctx, '薛定谔方程: iℏ ∂ψ/∂t = Ĥψ', cx, h*0.12, '#00b4d8', 15);
@@ -1024,65 +1064,103 @@ function drawSchrodinger(ctx, w, h, t, st) {
 
 function drawDirac(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
+  const cycle = t % 200; // 0-199 frame cycle
   
-  // Dirac sea — sea of negative energy
-  const seaY = h*0.65;
-  ctx.fillStyle = 'rgba(0,180,216,0.08)';
-  ctx.beginPath();
-  for (let x = 0; x < w; x += 4) {
-    const wave = Math.sin(x*0.03 + t*0.02) * 8;
-    if (x === 0) ctx.moveTo(x, seaY + wave);
-    ctx.lineTo(x, seaY + 15 + wave);
+  // Phase: 0-40: photon flies in, 40-80: pair creation, 80-140: pair flies apart, 140-180: annihilation, 180-200: two photons out
+  const phase = cycle < 40 ? 'incoming' : cycle < 80 ? 'creation' : cycle < 140 ? 'apart' : cycle < 180 ? 'annihilation' : 'photons';
+  const prog = phase === 'incoming' ? cycle/40 : phase === 'creation' ? (cycle-40)/40 : phase === 'apart' ? (cycle-80)/60 : phase === 'annihilation' ? (cycle-140)/40 : (cycle-180)/20;
+  
+  // Background grid
+  ctx.strokeStyle = 'rgba(136,153,170,0.06)';
+  ctx.lineWidth = 0.5;
+  for (let gx = 0; gx < w; gx += 30) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke(); }
+  for (let gy = 0; gy < h; gy += 30) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
+  
+  if (phase === 'incoming') {
+    // High-energy gamma photon approaching
+    const px = w*0.1 + prog * w*0.5;
+    ctx.strokeStyle = '#f4a261';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#f4a261';
+    ctx.shadowBlur = 12;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    for (let i = -10; i <= 10; i += 3) {
+      const wy = cy + i;
+      const wx = px + Math.sin(i*0.5 + t*0.1) * 5;
+      if (i === -10) ctx.moveTo(wx, wy); else ctx.lineTo(wx, wy);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.setLineDash([]);
+    glowText(ctx, 'γ 高能光子 (E > 1.022 MeV)', px - 50, cy - 30, '#f4a261', 10);
   }
-  ctx.lineTo(w, h);
-  ctx.lineTo(0, h);
-  ctx.fill();
   
-  ctx.fillStyle = 'rgba(136,153,170,0.5)';
-  ctx.font = '11px system-ui';
-  ctx.textAlign = 'left';
-  ctx.fillText('狄拉克之海 (负能量)', w*0.05, seaY - 5);
+  if (phase === 'creation' || phase === 'apart' || phase === 'annihilation') {
+    // Electron going left-down, positron going right-up
+    const sep = phase === 'creation' ? 5 + prog * 40 : phase === 'apart' ? 45 + prog * 60 : 105 - prog * 60;
+    
+    // Electron e⁻ (blue, going left)
+    const ex = cx - sep * 0.7;
+    const ey = cy + sep * 0.5;
+    ctx.fillStyle = '#00b4d8';
+    ctx.shadowColor = '#00b4d8';
+    ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(ex, ey, 8, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    glowText(ctx, 'e⁻ 电子', ex - 30, ey + 20, '#00b4d8', 10);
+    
+    // Positron e⁺ (pink, going right)
+    const px2 = cx + sep * 0.7;
+    const py2 = cy - sep * 0.5;
+    ctx.fillStyle = '#f72585';
+    ctx.shadowColor = '#f72585';
+    ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(px2, py2, 8, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    glowText(ctx, 'e⁺ 正电子', px2 + 20, py2 - 15, '#f72585', 10);
+    
+    // Trajectory trails
+    ctx.strokeStyle = 'rgba(0,180,216,0.2)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2,4]);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.strokeStyle = 'rgba(247,37,133,0.2)';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px2, py2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
   
-  // Electron (positive energy)
-  const ex = w*0.4 + Math.sin(t*0.04)*20;
-  const ey = h*0.35;
-  ctx.fillStyle = '#00b4d8';
-  ctx.shadowColor = '#00b4d8';
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  ctx.arc(ex, ey, 7, 0, Math.PI*2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  glowText(ctx, '电子 e⁻ (+E)', ex, ey - 18, '#00b4d8', 10);
+  if (phase === 'annihilation') {
+    // Annihilation flash
+    ctx.fillStyle = `rgba(244,162,97,${0.2 + prog*0.5})`;
+    ctx.beginPath(); ctx.arc(cx, cy, 15 + prog*10, 0, Math.PI*2); ctx.fill();
+  }
   
-  // Hole = positron
-  const hx = w*0.6 + Math.cos(t*0.04)*20;
-  const hy = seaY - 8;
-  ctx.strokeStyle = '#f72585';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([4,3]);
-  ctx.beginPath();
-  ctx.arc(hx, hy, 10, 0, Math.PI*2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(247,37,133,0.2)';
-  ctx.beginPath();
-  ctx.arc(hx, hy, 10, 0, Math.PI*2);
-  ctx.fill();
-  glowText(ctx, '空穴 = 正电子 e⁺', hx, hy - 20, '#f72585', 10);
+  if (phase === 'photons') {
+    // Two photons flying out
+    for (let i = 0; i < 2; i++) {
+      const angle = i === 0 ? -0.5 : 0.5;
+      const px3 = cx + prog * 80 * Math.cos(angle);
+      const py3 = cy + prog * 80 * Math.sin(angle);
+      ctx.strokeStyle = '#f4a261';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#f4a261';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      for (let j = -5; j <= 5; j += 2) {
+        const wy2 = py3 + j * 4;
+        const wx2 = px3 + Math.sin(j + t*0.2) * 4;
+        if (j === -5) ctx.moveTo(wx2, wy2); else ctx.lineTo(wx2, wy2);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
   
-  // Mirror line
-  ctx.strokeStyle = 'rgba(58,74,96,0.5)';
-  ctx.setLineDash([2,6]);
-  ctx.beginPath();
-  ctx.moveTo(w*0.1, cy);
-  ctx.lineTo(w*0.9, cy);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  glowText(ctx, '--- E=0 ---', w*0.9, cy-5, '#3a4a60', 9);
-  
-  glowText(ctx, '狄拉克方程: (iγ^μ ∂_μ - m)ψ = 0', cx, h*0.1, '#00b4d8', 14);
-  glowText(ctx, '一个方程，一个镜像世界', cx, h*0.9, '#8899aa', 12);
+  // Energy formula
+  const eqLabel = phase === 'creation' || phase === 'apart' ? 'E=mc²: 能量→物质!' : phase === 'annihilation' ? '物质→能量!' : '狄拉克方程预言反物质';
+  glowText(ctx, eqLabel, cx, h*0.06, '#f4a261', 12);
+  glowText(ctx, `狄拉克方程: (iγ^μ ∂_μ - m)ψ = 0`, cx, h*0.94, '#00b4d8', 12);
 }
 
 function drawQFT(ctx, w, h, t, st) {
@@ -1132,44 +1210,70 @@ function drawQFT(ctx, w, h, t, st) {
 
 function drawFeynman(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
+  const offset = (t % 200 < 100 ? t%100 : 100-(t%100)) * 0.3; // gentle pulse
   
-  // Electron lines
+  // Time arrow (bottom-left to top-right convention: time ↑)
+  ctx.strokeStyle = 'rgba(136,153,170,0.2)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,8]);
+  ctx.beginPath(); ctx.moveTo(w*0.05, h*0.7); ctx.lineTo(w*0.05, h*0.3); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#8899aa';
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText('时间 →', w*0.05, h*0.25);
+  
+  // Incoming electrons (left side): top-left and bottom-left
+  // Outgoing electrons (right side): top-right and bottom-right
+  const vx = cx; // vertex x
+  const vty = cy - 35; // top vertex y
+  const vby = cy + 35; // bottom vertex y
+  
+  // Top electron: in from top-left, out to top-right (scattered)
   ctx.strokeStyle = '#00b4d8';
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(w*0.1, h*0.2);
-  ctx.lineTo(cx - 30, cy - 20);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx - 30, cy - 20);
-  ctx.lineTo(w*0.9, h*0.2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(w*0.1, h*0.8);
-  ctx.lineTo(cx - 30, cy + 20);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx - 30, cy + 20);
-  ctx.lineTo(w*0.9, h*0.8);
-  ctx.stroke();
+  ctx.shadowColor = '#00b4d8';
+  ctx.shadowBlur = 6;
+  ctx.beginPath(); ctx.moveTo(w*0.15, vty - 30); ctx.lineTo(vx, vty); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(vx, vty); ctx.lineTo(w*0.85, vty + 30); ctx.stroke();
+  ctx.shadowBlur = 0;
   
-  // Photon exchange (wavy)
+  // Bottom electron: in from bottom-left, out to bottom-right (scattered)
+  ctx.beginPath(); ctx.moveTo(w*0.15, vby + 30); ctx.lineTo(vx, vby); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(vx, vby); ctx.lineTo(w*0.85, vby - 30); ctx.stroke();
+  
+  // Virtual photon exchange (wavy line between vertices)
+  const nWaves = 5;
   ctx.strokeStyle = '#f4a261';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([3,3]);
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#f4a261';
+  ctx.shadowBlur = 8 + offset * 3;
   ctx.beginPath();
-  ctx.moveTo(cx - 30, cy - 20);
-  ctx.lineTo(cx - 30, cy + 20);
+  for (let i = 0; i <= nWaves; i++) {
+    const frac = i / nWaves;
+    const y = vty + frac * (vby - vty);
+    const x = vx + Math.sin(frac * Math.PI * 3 + t*0.08) * (12 + offset * 2);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
   ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
+  
+  // Vertex dots
+  ctx.fillStyle = '#f4a261';
+  ctx.beginPath(); ctx.arc(vx, vty, 4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(vx, vby, 4, 0, Math.PI*2); ctx.fill();
   
   // Labels
-  glowText(ctx, 'e⁻', w*0.08, h*0.17, '#00b4d8', 12);
-  glowText(ctx, 'e⁻', w*0.08, h*0.83, '#00b4d8', 12);
-  glowText(ctx, 'e⁻', w*0.92, h*0.17, '#00b4d8', 12);
-  glowText(ctx, 'e⁻', w*0.92, h*0.83, '#00b4d8', 12);
-  glowText(ctx, 'γ (光子)', cx - 60, cy, '#f4a261', 11);
-  glowText(ctx, '费曼图: 两个电子交换一个光子', cx, h*0.92, '#8899aa', 13);
+  glowText(ctx, 'e⁻', w*0.12, vty - 36, '#00b4d8', 11);
+  glowText(ctx, 'e⁻', w*0.12, vby + 42, '#00b4d8', 11);
+  glowText(ctx, 'e⁻', w*0.88, vty + 36, '#00b4d8', 11);
+  glowText(ctx, 'e⁻', w*0.88, vby - 24, '#00b4d8', 11);
+  
+  // Virtual photon label
+  glowText(ctx, '虚光子 γ', vx + 25, (vty+vby)/2, '#f4a261', 10);
+  
+  glowText(ctx, 'Møller散射: e⁻e⁻ → e⁻e⁻ (交换虚光子)', cx, h*0.92, '#8899aa', 12);
+  glowText(ctx, '费曼图 — 每个图对应一个精确的量子振幅计算', cx, h*0.06, '#00b4d8', 12);
 }
 
 function drawStandard(ctx, w, h, t, st) {
@@ -1411,26 +1515,29 @@ function drawQCD(ctx, w, h, t, st) {
 }
 
 function drawString(ctx, w, h, t, st) {
-  const cx = w/2, cy = h/2;
+  const cx = w/2;
+  const mode = st?.mode || 1;
+  const amplitude = st?.amplitude || 20;
   
   // A single string vibrating in different modes
-  const modes = 3;
-  const modeSpacing = h*0.5 / modes;
+  const nModes = 3;
+  const modeSpacing = h*0.5 / nModes;
   
-  for (let m = 0; m < modes; m++) {
+  for (let m = 0; m < nModes; m++) {
     const stringY = h*0.2 + m * modeSpacing + modeSpacing/2;
-    const amplitude = 20 - m*5;
+    const thisAmp = amplitude - m*5;
+    const thisFreq = m + 1;
+    const active = (m+1 === mode);
     
-    ctx.strokeStyle = m === 0 ? '#00b4d8' : m === 1 ? '#f72585' : '#f4a261';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = ctx.strokeStyle;
-    ctx.shadowBlur = 6;
+    ctx.strokeStyle = active ? '#f72585' : m === 0 ? 'rgba(0,180,216,0.5)' : 'rgba(136,153,170,0.4)';
+    ctx.lineWidth = active ? 3 : 1.5;
+    if (active) { ctx.shadowColor = '#f72585'; ctx.shadowBlur = 10; }
     ctx.beginPath();
     
     const freq = m + 1;
     for (let x = w*0.15; x <= w*0.85; x += 2) {
       const normalized = (x - w*0.15) / (w*0.7);
-      const y = stringY + Math.sin(normalized * freq * Math.PI + t*0.04) * amplitude;
+      const y = stringY + Math.sin(normalized * freq * Math.PI + t*0.04) * thisAmp;
       if (x === w*0.15) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
