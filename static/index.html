@@ -159,11 +159,138 @@ body { background:var(--bg); color:var(--fg); font-family:var(--font); height:10
   .section-header h2 { font-size:21px; }
   .back-top { bottom:16px; right:16px; }
 }
+
+/* ══ Light Theme ══ */
+body.light { --bg: #f0f4f8; --surface: #ffffff; --surface2: #e8ecf1; --fg: #1a1a2e; --muted: #555; --faint: #bbb; --border: rgba(0,0,0,0.1); }
+body.light .sidebar { background: var(--surface); }
+body.light .controls { background: var(--surface2); }
+body.light .callout { background: var(--surface); }
+body.light .canvas-container { background: var(--surface); }
+
+/* ══ Top Nav Bar ══ */
+.topnav {
+  position:fixed; top:0; left:0; right:0; z-index:100; height:44px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; padding:0 16px;
+  backdrop-filter:blur(10px);
+}
+.topnav .logo { font-size:14px; color:var(--accent); font-weight:700; cursor:pointer; letter-spacing:1px; }
+.topnav .nav-btns { display:flex; gap:8px; align-items:center; }
+.topnav .nav-btn {
+  padding:4px 10px; border-radius:6px; border:1px solid var(--border);
+  background:transparent; color:var(--muted); font-size:11px; cursor:pointer;
+  font-family:var(--font); transition:all .2s;
+}
+.topnav .nav-btn:hover { border-color:var(--accent); color:var(--accent); }
+.topnav .nav-btn.active { background:rgba(0,180,216,0.15); border-color:var(--accent); color:var(--accent); }
+
+/* ══ Home View ══ */
+#home-view { padding-top:44px; display:none; }
+#home-view.active { display:block; }
+.home-hero {
+  text-align:center; padding:60px 20px 40px;
+  background:linear-gradient(180deg, rgba(0,180,216,0.08) 0%, transparent 100%);
+}
+.home-hero h1 { font-size:32px; color:var(--fg); margin-bottom:8px; }
+.home-hero .subtitle { font-size:14px; color:var(--muted); max-width:600px; margin:0 auto; line-height:1.8; }
+.home-hero .stats { display:flex; justify-content:center; gap:32px; margin-top:24px; }
+.home-hero .stat { text-align:center; }
+.home-hero .stat-num { font-size:28px; font-weight:700; color:var(--accent); }
+.home-hero .stat-label { font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+
+/* Timeline */
+.timeline-section { padding:32px 20px; max-width:800px; margin:0 auto; }
+.timeline-section h2 { font-size:18px; color:var(--accent); margin-bottom:20px; text-align:center; }
+.timeline { position:relative; padding-left:24px; border-left:2px solid var(--border); }
+.timeline-item { margin-bottom:24px; position:relative; }
+.timeline-item::before {
+  content:''; position:absolute; left:-30px; top:4px; width:10px; height:10px;
+  border-radius:50%; background:var(--accent); border:2px solid var(--surface);
+}
+.timeline-year { font-size:11px; color:var(--accent); font-weight:700; letter-spacing:1px; }
+.timeline-text { font-size:13px; color:var(--muted); line-height:1.7; margin-top:4px; }
+
+/* Concept Cards Grid */
+.cards-section { padding:20px; max-width:1000px; margin:0 auto; }
+.cards-section h2 { font-size:18px; color:var(--accent); margin-bottom:16px; text-align:center; }
+.search-bar {
+  display:flex; justify-content:center; margin-bottom:20px;
+}
+.search-bar input {
+  background:var(--surface2); border:1px solid var(--border); border-radius:20px;
+  padding:8px 20px; color:var(--fg); font-size:13px; width:280px; max-width:90%;
+  outline:none; font-family:var(--font);
+}
+.search-bar input:focus { border-color:var(--accent); }
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:14px; }
+.concept-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; cursor:pointer; transition:all .2s;
+}
+.concept-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 4px 20px rgba(0,180,216,0.1); }
+.concept-card .card-icon { font-size:24px; margin-bottom:8px; }
+.concept-card .card-num { font-size:10px; color:var(--faint); letter-spacing:1px; }
+.concept-card .card-title { font-size:15px; color:var(--fg); margin:4px 0; font-weight:600; }
+.concept-card .card-desc { font-size:12px; color:var(--muted); line-height:1.6; }
+.concept-card.hidden { display:none; }
+
+/* ══ Detail View ══ */
+#detail-view { padding-top:44px; display:none; }
+#detail-view.active { display:flex; }
+.no-results { text-align:center; color:var(--muted); padding:40px; font-size:14px; display:none; }
+
+/* Mobile topnav */
+@media (max-width:768px) {
+  .home-hero h1 { font-size:24px; }
+  .cards-grid { grid-template-columns:1fr; }
+  .timeline-section { padding:20px 12px; }
+  #detail-view.active { flex-direction:column; }
+}
+
 </style>
 </head>
 <body>
 
+  <div class="topnav">
+    <span class="logo" onclick="showView('home')">⚛️ 量子物理</span>
+    <div class="nav-btns">
+      <button class="nav-btn active" id="navHome" onclick="showView('home')">🏠 首页</button>
+      <button class="nav-btn" id="navDetail" onclick="showView('detail')">📚 知识库</button>
+      <button class="nav-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
+      <button class="nav-btn" onclick="toggleLang()" id="langBtn">EN</button>
+    </div>
+  </div>
+
+
+  <div id="home-view" class="active">
+    <div class="home-hero">
+      <h1>⚛️ 量子物理交互科普</h1>
+      <p class="subtitle" id="heroSubtitle">从1900年普朗克的"绝望之举"，到2020年代的量子计算——这是一场人类对宇宙最底层规则的探索。这里没有公式堆砌，只有故事、动画和你能亲手操作的交互实验。</p>
+      <div class="stats">
+        <div class="stat"><div class="stat-num">15</div><div class="stat-label">核心概念</div></div>
+        <div class="stat"><div class="stat-num">125</div><div class="stat-label">年物理学史</div></div>
+        <div class="stat"><div class="stat-num">17</div><div class="stat-label">基本粒子</div></div>
+      </div>
+    </div>
+    
+    <div class="timeline-section">
+      <h2>📜 近代物理编年史</h2>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    
+    <div class="cards-section">
+      <h2>🧭 探索量子世界</h2>
+      <div class="search-bar"><input type="text" id="searchInput" placeholder="搜索概念... (如: 波粒二象性, 量子纠缠)" oninput="filterCards()"></div>
+      <div class="cards-grid" id="cardsGrid"></div>
+      <div class="no-results" id="noResults">未找到匹配的概念 🔍</div>
+    </div>
+
+  </div>
+
+
 <!-- Sidebar -->
+<div id="detail-view">
 <nav class="sidebar" id="sidebar">
   <div class="sidebar-header" onclick="document.getElementById('sidebar').classList.toggle('open')">
     <h1>⚛️ 量子物理科普</h1>
@@ -1599,7 +1726,9 @@ function drawQC(ctx, w, h, t, st) {
 // ═══════════════════════════════════════
 // Init first canvas
 // ═══════════════════════════════════════
-setTimeout(() => initCanvas('planck'), 200);
+// initCanvas handled by showConcept now
 </script>
+
+</div>
 </body>
 </html>
