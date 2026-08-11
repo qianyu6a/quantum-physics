@@ -82,6 +82,7 @@ body { background:var(--bg); color:var(--fg); font-family:var(--font); height:10
 .canvas-container {
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
   margin:20px 0; overflow:hidden; position:relative;
+  touch-action:none; user-select:none; -webkit-user-select:none;
 }
 .canvas-container canvas { display:block; width:100%; }
 .canvas-container .canvas-label {
@@ -90,7 +91,37 @@ body { background:var(--bg); color:var(--fg); font-family:var(--font); height:10
 }
 .canvas-container .canvas-hint {
   position:absolute; bottom:10px; left:14px; font-size:10px;
-  color:var(--faint); opacity:0.7;
+  color:var(--faint); opacity:0.7; pointer-events:none;
+}
+
+/* Control Panel */
+.controls {
+  display:flex; flex-wrap:wrap; gap:12px; padding:12px 16px;
+  background:var(--surface2); border-top:1px solid var(--border);
+  align-items:center;
+}
+.controls label { font-size:11px; color:var(--muted); white-space:nowrap; }
+.controls input[type="range"] {
+  -webkit-appearance:none; appearance:none; height:4px;
+  background:var(--faint); border-radius:2px; outline:none; cursor:pointer;
+  width:100px;
+}
+.controls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none; width:16px; height:16px;
+  border-radius:50%; background:var(--accent); cursor:pointer;
+  box-shadow:0 0 8px rgba(0,180,216,0.4);
+}
+.controls .btn {
+  padding:5px 14px; border-radius:14px; border:1px solid var(--accent);
+  background:transparent; color:var(--accent); font-size:11px; cursor:pointer;
+  transition:all .2s; font-family:var(--font);
+}
+.controls .btn:hover { background:rgba(0,180,216,0.15); }
+.controls .btn:active { transform:scale(0.95); }
+.controls .val { font-size:11px; color:var(--accent); min-width:30px; }
+@media (max-width:768px) {
+  .controls { gap:8px; padding:10px 12px; }
+  .controls input[type="range"] { width:70px; }
 }
 
 /* Tags */
@@ -353,9 +384,32 @@ function updateBackTop() {
 }
 
 // ═══════════════════════════════════════
-// Canvas System
+// Canvas Interaction System v2 — Touch + State + Controls
 // ═══════════════════════════════════════
 const canvases = {};
+const canvasStates = {};
+
+// Default state per concept
+function defaultState(id) {
+  switch(id) {
+    case 'planck': return { freq: 5, showClassical: true };
+    case 'photoelectric': return { freq: 7, intensity: 50, threshold: 4.5 };
+    case 'bohr': return { level: 1, autoJump: true };
+    case 'debroglie': return { momentum: 1, showWave: true };
+    case 'uncertainty': return { spread: 30, dragging: false, dragX: 0 };
+    case 'schrodinger': return { n: 3, wellDepth: 1, timeSpeed: 1 };
+    case 'dirac': return { energy: 1.5, showPair: false };
+    case 'qft': return { fieldStrength: 1, excitationCount: 5 };
+    case 'feynman': return { exchangeMomentum: 1 };
+    case 'standard': return { highlightParticle: null };
+    case 'higgs': return { couplingStrength: 1 };
+    case 'entanglement': return { measured: false, angle: 0 };
+    case 'qcd': return { pullStrength: 0, quarks: 3 };
+    case 'string': return { mode: 1, amplitude: 20 };
+    case 'qc': return { theta: Math.PI/4, phi: 0, gate: null };
+    default: return {};
+  }
+}
 
 function initCanvas(id) {
   const c = concepts.find(x => x.id === id);
@@ -365,7 +419,7 @@ function initCanvas(id) {
   
   const container = canvas.parentElement;
   const w = container.clientWidth;
-  const h = Math.min(380, w * 0.65);
+  const h = Math.min(400, w * 0.7);
   canvas.width = w * 2;
   canvas.height = h * 2;
   canvas.style.width = w + 'px';
@@ -374,37 +428,254 @@ function initCanvas(id) {
   const ctx = canvas.getContext('2d');
   ctx.scale(2, 2);
   
-  // Store for animation
-  canvases[id] = { ctx, w, h, canvas, frame:0 };
+  // Init or reuse state
+  if (!canvasStates[id]) canvasStates[id] = defaultState(id);
+  const state = canvasStates[id];
   
-  // Start animation
+  canvases[id] = { ctx, w, h, canvas, frame: 0, state };
+  
+  // Build control panel
+  buildControls(id, container);
+  
+  // Touch/mouse events
+  canvas.onmousedown = canvas.ontouchstart = e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    handlePress(id, x, y);
+  };
+  canvas.onmousemove = canvas.ontouchmove = e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    handleMove(id, x, y);
+  };
+  canvas.onmouseup = canvas.ontouchend = () => handleRelease(id);
+  canvas.onmouseleave = () => handleRelease(id);
+  
   drawCanvas(id);
 }
 
-function drawCanvas(id) {
-  const state = canvases[id];
-  if (!state) return;
-  state.frame++;
+function buildControls(id, container) {
+  // Remove old controls
+  const old = container.querySelector('.controls');
+  if (old) old.remove();
   
-  const { ctx, w, h } = state;
+  const s = canvasStates[id];
+  if (!s) return;
+  
+  const div = document.createElement('div');
+  div.className = 'controls';
+  
+  switch(id) {
+    case 'photoelectric':
+      div.innerHTML = `
+        <label>频率 ν</label><input type="range" min="1" max="10" value="${s.freq}" id="ctrl-${id}-freq">
+        <span class="val" id="val-${id}-freq">${s.freq}</span>
+        <label>强度 I</label><input type="range" min="1" max="100" value="${s.intensity}" id="ctrl-${id}-intensity">
+        <span class="val" id="val-${id}-intensity">${s.intensity}</span>
+        <span style="font-size:11px;color:var(--muted)">阈值: ${s.threshold}</span>
+        <span style="font-size:10px;color:${s.freq>=s.threshold?'var(--green)':'var(--pink)'}" id="ctrl-${id}-status">${s.freq>=s.threshold?'✅ 激发':'❌ 不足'}</span>
+      `;
+      break;
+    case 'bohr':
+      div.innerHTML = `
+        <label>能级</label><input type="range" min="1" max="4" value="${s.level}" id="ctrl-${id}-level">
+        <span class="val" id="val-${id}-level">n=${s.level}</span>
+        <button class="btn" id="ctrl-${id}-jump">⚡ 跃迁</button>
+      `;
+      break;
+    case 'uncertainty':
+      div.innerHTML = `
+        <label>波包宽度 Δx</label><input type="range" min="5" max="60" value="${s.spread}" id="ctrl-${id}-spread">
+        <span class="val" id="val-${id}-spread">${s.spread}</span>
+        <span style="font-size:10px;color:var(--muted)">Δp ≈ ${(1/s.spread*20).toFixed(1)}</span>
+        <span style="font-size:10px;color:var(--accent)">拖拽波形也行</span>
+      `;
+      break;
+    case 'schrodinger':
+      div.innerHTML = `
+        <label>能级 n</label><input type="range" min="1" max="6" value="${s.n}" id="ctrl-${id}-n">
+        <span class="val" id="val-${id}-n">n=${s.n}</span>
+        <label>势阱</label><input type="range" min="1" max="3" step="0.5" value="${s.wellDepth}" id="ctrl-${id}-depth">
+        <span class="val" id="val-${id}-depth">V₀=${s.wellDepth}</span>
+      `;
+      break;
+    case 'entanglement':
+      div.innerHTML = `
+        <button class="btn" id="ctrl-${id}-measure">📏 测量</button>
+        <button class="btn" id="ctrl-${id}-reset">🔄 重置</button>
+        <span style="font-size:11px;color:var(--muted)">${s.measured ? '已坍缩: A='+s.resultA+' B='+s.resultB : '等待测量...'}</span>
+      `;
+      break;
+    case 'qc':
+      div.innerHTML = `
+        <button class="btn" id="ctrl-${id}-X">X门</button>
+        <button class="btn" id="ctrl-${id}-H">H门</button>
+        <button class="btn" id="ctrl-${id}-Z">Z门</button>
+        <button class="btn" id="ctrl-${id}-reset">🔄 重置</button>
+        <span style="font-size:10px;color:var(--muted)">或拖拽球体</span>
+      `;
+      break;
+    case 'planck':
+      div.innerHTML = `
+        <label>频率 ν</label><input type="range" min="1" max="10" value="${s.freq}" id="ctrl-${id}-freq">
+        <span class="val" id="val-${id}-freq">${s.freq}</span>
+        <button class="btn" id="ctrl-${id}-toggle">${s.showClassical?'隐藏':'显示'}经典曲线</button>
+      `;
+      break;
+    case 'debroglie':
+      div.innerHTML = `
+        <label>动量 p</label><input type="range" min="1" max="10" value="${s.momentum}" id="ctrl-${id}-p">
+        <span class="val" id="val-${id}-p">${s.momentum}</span>
+        <span style="font-size:10px;color:var(--muted)">λ = h/p = ${(1/s.momentum).toFixed(2)}</span>
+        <button class="btn" id="ctrl-${id}-fire">🔫 发射粒子</button>
+      `;
+      break;
+    case 'dirac':
+      div.innerHTML = `
+        <label>光子能量 E</label><input type="range" min="1" max="5" step="0.5" value="${s.energy}" id="ctrl-${id}-energy">
+        <span class="val" id="val-${id}-energy">${s.energy} MeV</span>
+        <button class="btn" id="ctrl-${id}-pair">⚡ 产生对粒子</button>
+      `;
+      break;
+    case 'string':
+      div.innerHTML = `
+        <label>振动模式</label><input type="range" min="1" max="5" value="${s.mode}" id="ctrl-${id}-mode">
+        <span class="val" id="val-${id}-mode">n=${s.mode}</span>
+        <span style="font-size:10px;color:var(--muted)">${['电子','μ子','τ子','顶夸克','希格斯'][s.mode-1]||'?'}</span>
+      `;
+      break;
+    default:
+      div.innerHTML = `<span style="font-size:10px;color:var(--faint)">💡 点击/拖动画面进行交互</span>`;
+  }
+  
+  container.appendChild(div);
+  
+  // Bind controls
+  div.querySelectorAll('input[type=range]').forEach(slider => {
+    slider.oninput = () => {
+      const key = slider.id.replace(`ctrl-${id}-`, '');
+      canvasStates[id][key] = parseFloat(slider.value);
+      const valEl = document.getElementById(`val-${id}-${key}`);
+      if (valEl) valEl.textContent = key==='n'||key==='level' ? `n=${slider.value}` : slider.value;
+      if (key==='freq' && id==='photoelectric') {
+        const s = document.getElementById(`ctrl-${id}-status`);
+        if (s) { s.textContent = parseFloat(slider.value)>=canvasStates[id].threshold ? '✅ 激发':'❌ 不足'; s.style.color = parseFloat(slider.value)>=canvasStates[id].threshold ? 'var(--green)':'var(--pink)'; }
+      }
+    };
+  });
+  
+  div.querySelectorAll('.btn').forEach(btn => {
+    btn.onclick = () => {
+      const action = btn.id.replace(`ctrl-${id}-`, '');
+      handleButton(id, action);
+    };
+  });
+}
+
+function handlePress(id, x, y) {
+  const s = canvasStates[id];
+  if (!s) return;
+  
+  if (id === 'uncertainty') {
+    s.dragging = true;
+    s.dragX = x;
+  }
+  if (id === 'qc') {
+    // Start dragging Bloch sphere
+    s.dragging = true;
+    s.dragStart = { x, y, theta: s.theta, phi: s.phi };
+  }
+  if (id === 'qcd') {
+    s.pullStrength = 1;
+  }
+}
+
+function handleMove(id, x, y) {
+  const s = canvasStates[id];
+  if (!s || !s.dragging) return;
+  
+  if (id === 'uncertainty') {
+    s.spread = Math.max(5, Math.min(60, Math.abs(x - s.dragX) + 10));
+    const slider = document.getElementById(`ctrl-uncertainty-spread`);
+    if (slider) slider.value = s.spread;
+    const val = document.getElementById(`val-uncertainty-spread`);
+    if (val) val.textContent = s.spread;
+  }
+  if (id === 'qc' && s.dragStart) {
+    const dx = x - s.dragStart.x;
+    const dy = y - s.dragStart.y;
+    s.theta = Math.max(0.01, Math.min(Math.PI-0.01, s.dragStart.theta + dy*0.01));
+    s.phi = s.dragStart.phi + dx*0.01;
+  }
+}
+
+function handleRelease(id) {
+  const s = canvasStates[id];
+  if (!s) return;
+  s.dragging = false;
+  if (id === 'qcd') s.pullStrength = 0;
+}
+
+function handleButton(id, action) {
+  const s = canvasStates[id];
+  
+  switch(action) {
+    case 'jump':
+      s.level = s.level >= 4 ? 1 : s.level + 1;
+      s.autoJump = false;
+      setTimeout(() => s.autoJump = true, 2000);
+      break;
+    case 'measure':
+      if (id === 'entanglement' && !s.measured) {
+        s.resultA = Math.random() > 0.5 ? '↑' : '↓';
+        s.resultB = s.resultA === '↑' ? '↓' : '↑';
+        s.measured = true;
+        setTimeout(() => { s.measured = false; buildControls(id, document.getElementById(`sec-${id}`).querySelector('.canvas-container')); }, 3000);
+      }
+      break;
+    case 'reset':
+      if (id === 'entanglement') { s.measured = false; s.resultA = null; s.resultB = null; }
+      if (id === 'qc') { s.theta = Math.PI/4; s.phi = 0; }
+      break;
+    case 'X': s.theta = Math.PI - s.theta; s.phi = -s.phi; break;
+    case 'Z': s.phi += Math.PI; break;
+    case 'H': s.theta = Math.PI/4; s.phi = 0; break;
+    case 'pair': s.showPair = true; setTimeout(() => s.showPair = false, 2000); break;
+    case 'toggle': s.showClassical = !s.showClassical; break;
+    case 'fire': s.fireTime = canvases[id].frame; break;
+  }
+  
+  buildControls(id, document.getElementById(`sec-${id}`).querySelector('.canvas-container'));
+}
+
+function drawCanvas(id) {
+  const cvs = canvases[id];
+  if (!cvs) return;
+  cvs.frame++;
+  
+  const { ctx, w, h, state } = cvs;
   ctx.clearRect(0, 0, w, h);
   
   switch(id) {
-    case 'planck': drawPlanck(ctx, w, h, state.frame); break;
-    case 'photoelectric': drawPhotoelectric(ctx, w, h, state.frame); break;
-    case 'bohr': drawBohr(ctx, w, h, state.frame); break;
-    case 'debroglie': drawDeBroglie(ctx, w, h, state.frame); break;
-    case 'uncertainty': drawUncertainty(ctx, w, h, state.frame); break;
-    case 'schrodinger': drawSchrodinger(ctx, w, h, state.frame); break;
-    case 'dirac': drawDirac(ctx, w, h, state.frame); break;
-    case 'qft': drawQFT(ctx, w, h, state.frame); break;
-    case 'feynman': drawFeynman(ctx, w, h, state.frame); break;
-    case 'standard': drawStandard(ctx, w, h, state.frame); break;
-    case 'higgs': drawHiggs(ctx, w, h, state.frame); break;
-    case 'entanglement': drawEntanglement(ctx, w, h, state.frame); break;
-    case 'qcd': drawQCD(ctx, w, h, state.frame); break;
-    case 'string': drawString(ctx, w, h, state.frame); break;
-    case 'qc': drawQC(ctx, w, h, state.frame); break;
+    case 'planck': drawPlanck(ctx, w, h, cvs.frame, state); break;
+    case 'photoelectric': drawPhotoelectric(ctx, w, h, cvs.frame, state); break;
+    case 'bohr': drawBohr(ctx, w, h, cvs.frame, state); break;
+    case 'debroglie': drawDeBroglie(ctx, w, h, cvs.frame, state); break;
+    case 'uncertainty': drawUncertainty(ctx, w, h, cvs.frame, state); break;
+    case 'schrodinger': drawSchrodinger(ctx, w, h, cvs.frame, state); break;
+    case 'dirac': drawDirac(ctx, w, h, cvs.frame, state); break;
+    case 'qft': drawQFT(ctx, w, h, cvs.frame, state); break;
+    case 'feynman': drawFeynman(ctx, w, h, cvs.frame, state); break;
+    case 'standard': drawStandard(ctx, w, h, cvs.frame, state); break;
+    case 'higgs': drawHiggs(ctx, w, h, cvs.frame, state); break;
+    case 'entanglement': drawEntanglement(ctx, w, h, cvs.frame, state); break;
+    case 'qcd': drawQCD(ctx, w, h, cvs.frame, state); break;
+    case 'string': drawString(ctx, w, h, cvs.frame, state); break;
+    case 'qc': drawQC(ctx, w, h, cvs.frame, state); break;
   }
   
   requestAnimationFrame(() => drawCanvas(id));
@@ -439,90 +710,112 @@ function gradientLine(ctx, x1, y1, x2, y2, c1, c2) {
 // Canvas Drawing Functions
 // ═══════════════════════════════════════
 
-function drawPlanck(ctx, w, h, t) {
+function drawPlanck(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
-  // Energy ladder
-  const levels = 12;
-  const stepH = h * 0.6 / levels;
-  const startY = h * 0.8;
+  const freq = st?.freq || 5;
   
-  for (let i = 0; i < levels; i++) {
-    const y = startY - i * stepH;
-    const alpha = 0.3 + 0.7 * (i / levels);
-    ctx.strokeStyle = `rgba(0,180,216,${alpha})`;
+  // Draw axes
+  ctx.strokeStyle = 'rgba(136,153,170,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(w*0.08, h*0.15); ctx.lineTo(w*0.08, h*0.85); ctx.lineTo(w*0.92, h*0.85); ctx.stroke();
+  
+  // Classical Rayleigh-Jeans (UV catastrophe!)
+  if (st?.showClassical !== false) {
+    ctx.strokeStyle = '#f72585';
     ctx.lineWidth = 2;
+    ctx.setLineDash([4,3]);
+    ctx.shadowColor = '#f72585';
+    ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.moveTo(w*0.2, y);
-    ctx.lineTo(w*0.8, y);
+    for (let v = 1; v <= 15; v += 0.2) {
+      const x = w*0.08 + (v/15) * w*0.84;
+      const intensity = v * v * 0.12;
+      const y = h*0.85 - Math.min(intensity * h, h*0.65);
+      if (v === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
     ctx.stroke();
-    
-    // Energy label
-    ctx.fillStyle = `rgba(136,153,170,${alpha})`;
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'right';
-    ctx.fillText(`${i}hν`, w*0.18, y+4);
-  }
-  
-  // Particle bouncing
-  const particleY = startY - (t*0.02 % levels) * stepH - stepH/2;
-  ctx.fillStyle = '#f72585';
-  ctx.shadowColor = '#f72585';
-  ctx.shadowBlur = 15;
-  ctx.beginPath();
-  ctx.arc(cx, particleY, 8, 0, Math.PI*2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  
-  // Title
-  glowText(ctx, '能量 = hν × n', cx, h*0.12, '#00b4d8', 16);
-  glowText(ctx, '能量必须取整数倍', cx, h*0.19, '#8899aa', 12);
-}
-
-function drawPhotoelectric(ctx, w, h, t) {
-  const cx = w/2;
-  // Metal surface
-  ctx.fillStyle = '#3a4a60';
-  ctx.fillRect(w*0.1, h*0.75, w*0.8, 4);
-  
-  // UV photons (purple, high energy) - hit from left
-  for (let i = 0; i < 4; i++) {
-    const px = w*0.15 + i*60 + (t*0.5 % 60);
-    const py = h*0.4 + Math.sin(t*0.05 + i)*15;
-    ctx.fillStyle = '#7209b7';
-    ctx.shadowColor = '#7209b7';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.arc(px, py, 5, 0, Math.PI*2);
-    ctx.fill();
     ctx.shadowBlur = 0;
-    
-    // Arrow
-    ctx.strokeStyle = '#7209b7';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.lineTo(px-12, py-12);
-    ctx.stroke();
+    ctx.setLineDash([]);
+    glowText(ctx, '瑞利-金斯 (→∞紫外灾难!)', w*0.65, h*0.22, '#f72585', 10);
   }
   
-  // Electron ejected
-  const ex = cx + 40 + Math.sin(t*0.03)*30;
-  const ey = h*0.55 + (t*0.02 % 1)*20;
-  ctx.fillStyle = '#f4a261';
-  ctx.shadowColor = '#f4a261';
+  // Planck curve — peaks then falls
+  ctx.strokeStyle = '#00b4d8';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = '#00b4d8';
   ctx.shadowBlur = 10;
   ctx.beginPath();
-  ctx.arc(ex, ey, 6, 0, Math.PI*2);
-  ctx.fill();
+  for (let v = 1; v <= 15; v += 0.2) {
+    const x = w*0.08 + (v/15) * w*0.84;
+    const planck = Math.pow(v, 3) / (Math.exp(v/freq) - 1) * 0.3;
+    const y = h*0.85 - Math.min(planck * h, h*0.65);
+    if (v === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
   ctx.shadowBlur = 0;
   
-  // Labels
-  glowText(ctx, '紫光 (高频率) → 打出电子', w*0.25, h*0.25, '#7209b7', 12);
-  glowText(ctx, '金属表面', w*0.5, h*0.72, '#8899aa', 11);
-  glowText(ctx, 'E = hν 决定能不能打出', cx, h*0.92, '#00b4d8', 13);
+  // Frequency marker
+  const mx = w*0.08 + (freq/15)*w*0.84;
+  ctx.fillStyle = '#f4a261';
+  ctx.beginPath(); ctx.arc(mx, h*0.85 - Math.pow(freq,3)/(Math.exp(1)-1)*0.3*h, 6, 0, Math.PI*2); ctx.fill();
+  
+  glowText(ctx, '普朗克公式 — E = hν', w*0.35, h*0.18, '#00b4d8', 14);
+  glowText(ctx, `ν = ${freq}`, mx, h*0.82, '#f4a261', 10);
+  ctx.fillStyle = '#8899aa';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('频率 ν →', w*0.5, h*0.92);
 }
 
-function drawBohr(ctx, w, h, t) {
+function drawPhotoelectric(ctx, w, h, t, st) {
+  const cx = w/2;
+  const freq = st?.freq || 7;
+  const intensity = st?.intensity || 50;
+  const threshold = st?.threshold || 4.5;
+  const isAbove = freq >= threshold;
+  
+  // Metal surface
+  ctx.fillStyle = '#3a4a60';
+  ctx.fillRect(w*0.1, h*0.7, w*0.8, 4);
+  glowText(ctx, '金属表面', w*0.25, h*0.66, '#8899aa', 10);
+  
+  // Incoming photons — size = frequency energy
+  const nPhotons = Math.floor(intensity / 10);
+  for (let i = 0; i < nPhotons; i++) {
+    const py = h*0.25 + i*(h*0.35/nPhotons) + Math.sin(t*0.05 + i)*5;
+    const px = w*0.1 + (t*1.5 + i*20) % (w*0.6);
+    const energy = freq/threshold;
+    ctx.fillStyle = isAbove ? '#7209b7' : '#3a4a60';
+    ctx.shadowColor = isAbove ? '#7209b7' : 'transparent';
+    ctx.shadowBlur = isAbove ? 10 : 0;
+    ctx.beginPath();
+    ctx.arc(px, py, 3 + energy, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  
+  // Ejected electrons if above threshold
+  if (isAbove) {
+    for (let i = 0; i < Math.min(nPhotons, 6); i++) {
+      const ex = w*0.4 + i*60 + (t*0.8 + i*20) % (w*0.4);
+      const ey = h*0.5 + Math.sin(t*0.04 + i)*10;
+      ctx.fillStyle = '#f4a261';
+      ctx.shadowColor = '#f4a261';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 4, 0, Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+  
+  const status = isAbove ? '✅ 电子被激发!' : '❌ 频率不足';
+  glowText(ctx, status, cx, h*0.92, isAbove ? '#2ec4b6' : '#f72585', 14);
+  glowText(ctx, `ν=${freq} (阈值=${threshold}) | 强度=${intensity}%`, cx, h*0.08, '#00b4d8', 12);
+  glowText(ctx, '光电效应: E = hν — 频率决定能不能打出电子', w*0.6, h*0.15, '#8899aa', 10);
+}
+
+function drawBohr(ctx, w, h, t, st) {
   const cx = w/2, cy = h*0.5;
   const radii = [35, 60, 85, 115];
   const colors = ['#00b4d8', '#7209b7', '#f72585', '#f4a261'];
@@ -581,7 +874,7 @@ function drawBohr(ctx, w, h, t) {
   glowText(ctx, '跃迁释放光子 hν = ΔE', w*0.7, h*0.15, '#00b4d8', 11);
 }
 
-function drawDeBroglie(ctx, w, h, t) {
+function drawDeBroglie(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // Wave
@@ -613,7 +906,7 @@ function drawDeBroglie(ctx, w, h, t) {
   glowText(ctx, '每个粒子都是一列波', cx, h*0.85, '#8899aa', 13);
 }
 
-function drawUncertainty(ctx, w, h, t) {
+function drawUncertainty(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // Position distribution (Gaussian)
@@ -1127,56 +1420,44 @@ function drawString(ctx, w, h, t) {
   glowText(ctx, '弦论: 所有粒子是同一根弦的不同"音符"', cx, h*0.92, '#8899aa', 12);
 }
 
-function drawQC(ctx, w, h, t) {
+function drawQC(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
+  const theta = st?.theta || Math.PI/4;
+  const phi = st?.phi || 0;
   
-  // Bloch sphere representation
+  // Bloch sphere
   ctx.strokeStyle = 'rgba(136,153,170,0.3)';
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 80, 0, Math.PI*2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, 80, 25, 0, 0, Math.PI*2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx, cy-80);
-  ctx.lineTo(cx, cy+80);
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, 80, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(cx, cy, 80, 25, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, cy-80); ctx.lineTo(cx, cy+80); ctx.stroke();
   
   // State vector
-  const angle = t*0.03;
   const r = 75;
-  const sx = cx + r * Math.sin(angle) * Math.cos(angle*0.5);
-  const sy = cy - r * Math.cos(angle*0.5);
+  const sx = cx + r * Math.sin(theta) * Math.cos(phi);
+  const sy = cy - r * Math.cos(theta);
+  const sz = r * Math.sin(theta) * Math.sin(phi);
   
   ctx.strokeStyle = '#f72585';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.shadowColor = '#f72585';
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(sx, sy);
-  ctx.stroke();
+  ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(sx, sy - sz*0.2); ctx.stroke();
   ctx.shadowBlur = 0;
   
   ctx.fillStyle = '#f72585';
-  ctx.beginPath();
-  ctx.arc(sx, sy, 5, 0, Math.PI*2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(sx, sy - sz*0.2, 7, 0, Math.PI*2); ctx.fill();
   
-  // |0> and |1> labels
   ctx.fillStyle = '#00b4d8';
-  ctx.font = '13px system-ui';
+  ctx.font = 'bold 13px system-ui';
   ctx.textAlign = 'center';
   ctx.fillText('|0⟩', cx, cy - 92);
   ctx.fillText('|1⟩', cx, cy + 100);
   
-  // Superposition note
-  const cosA = Math.cos(angle*0.5);
-  const sinA = Math.sin(angle*0.5);
-  glowText(ctx, `|ψ⟩ = ${cosA.toFixed(2)}|0⟩ + ${sinA.toFixed(2)}|1⟩`, cx, h*0.88, '#f72585', 13);
-  glowText(ctx, '布洛赫球 — qubit 可以同时在 |0⟩ 和 |1⟩', cx, h*0.08, '#00b4d8', 13);
+  const a0 = Math.cos(theta/2);
+  const a1 = Math.sin(theta/2) * (Math.cos(phi) + (Math.sin(phi)>0?'+':'') + Math.sin(phi).toFixed(2)+'i');
+  glowText(ctx, `|ψ⟩ = ${a0.toFixed(2)}|0⟩ + ${Math.sin(theta/2).toFixed(2)}e^${phi.toFixed(1)}i|1⟩`, cx, h*0.88, '#f72585', 12);
+  glowText(ctx, '布洛赫球 — 拖拽旋转 | 量子门操作', cx, h*0.06, '#00b4d8', 12);
 }
 
 // ═══════════════════════════════════════
