@@ -185,7 +185,7 @@ body.light .canvas-container { background: var(--surface); }
 .topnav .nav-btn.active { background:rgba(0,180,216,0.15); border-color:var(--accent); color:var(--accent); }
 
 /* ══ Home View ══ */
-#home-view { padding-top:44px; display:none; }
+#home-view { padding-top:44px; display:none; min-height:100vh; }
 #home-view.active { display:block; }
 .home-hero {
   text-align:center; padding:60px 20px 40px;
@@ -235,16 +235,19 @@ body.light .canvas-container { background: var(--surface); }
 .concept-card.hidden { display:none; }
 
 /* ══ Detail View ══ */
-#detail-view { padding-top:44px; display:none; }
-#detail-view.active { display:flex; }
+#detail-view { padding-top:44px; display:none; min-height:100vh; }
+#detail-view.active { display:flex; height:100vh; overflow:hidden; }
 .no-results { text-align:center; color:var(--muted); padding:40px; font-size:14px; display:none; }
 
 /* Mobile topnav */
 @media (max-width:768px) {
+  body { overflow-y:auto; overflow-x:hidden; }
   .home-hero h1 { font-size:24px; }
   .cards-grid { grid-template-columns:1fr; }
   .timeline-section { padding:20px 12px; }
   #detail-view.active { flex-direction:column; }
+  #detail-view.active .sidebar { width:100%; min-width:100%; max-height:50px; overflow:hidden; }
+  #detail-view.active .content { flex:1; overflow-y:auto; }
 }
 
 </style>
@@ -418,6 +421,7 @@ const concepts = [
 // ═══════════════════════════════════════
 // Build UI
 // ═══════════════════════════════════════
+const zhConcepts = JSON.parse(JSON.stringify(concepts)); // immutable Chinese backup
 const tree = document.getElementById('tree');
 const content = document.getElementById('content');
 let activeId = concepts[0].id;
@@ -1739,6 +1743,8 @@ function showView(view) {
   document.getElementById('detail-view').classList.toggle('active', view === 'detail');
   document.getElementById('navHome').classList.toggle('active', view === 'home');
   document.getElementById('navDetail').classList.toggle('active', view === 'detail');
+  // Mobile: lock body scroll when in detail view
+  document.body.style.overflow = (view === 'detail' && window.innerWidth <= 768) ? 'hidden' : '';
   if (view === 'detail') {
     if (!activeId) activeId = 'planck';
     setTimeout(() => { showConcept(activeId); }, 100);
@@ -1772,40 +1778,40 @@ function toggleLang() {
   document.getElementById('langBtn').textContent = currentLang === 'zh' ? 'EN' : '中文';
   if (!translations) return;
   
-  // Remember current view state
   const wasOnDetail = document.getElementById('detail-view').classList.contains('active');
   const currentConcept = activeId || 'planck';
   
-  // Swap concept data
-  concepts.forEach(c => {
-    const t = translations[c.id];
-    if (!t) return;
-    if (currentLang === 'en') {
-      c._zh = { title: c.title, tagline: c.tagline, problem: c.problem, insight: c.insight, bigpic: c.bigpic };
-      c.title = t.title || c.title;
-      c.tagline = t.tagline || c.tagline;
-      c.problem = t.problem || c.problem;
-      c.insight = t.insight || c.insight;
-      c.bigpic = t.bigpic || c.bigpic;
-    } else if (c._zh) {
-      c.title = c._zh.title;
-      c.tagline = c._zh.tagline;
-      c.problem = c._zh.problem;
-      c.insight = c._zh.insight;
-      c.bigpic = c._zh.bigpic;
-    }
-  });
+  if (currentLang === 'en') {
+    // Overwrite concepts with English translations
+    concepts.forEach(c => {
+      const t = translations[c.id];
+      if (t) {
+        c.title = t.title || c.title;
+        c.tagline = t.tagline || c.tagline;
+        c.problem = t.problem || c.problem;
+        c.insight = t.insight || c.insight;
+        c.bigpic = t.bigpic || c.bigpic;
+      }
+    });
+  } else {
+    // Restore from immutable Chinese backup
+    concepts.forEach((c, i) => {
+      const orig = zhConcepts[i];
+      if (orig) {
+        c.title = orig.title; c.tagline = orig.tagline;
+        c.problem = orig.problem; c.insight = orig.insight; c.bigpic = orig.bigpic;
+      }
+    });
+  }
   
-  // Rebuild home cards
+  // Rebuild both views
   document.getElementById('cardsGrid').innerHTML = '';
   buildHomePage();
-  
-  // Rebuild detail view (tree + sections)
   document.getElementById('tree').innerHTML = '';
   document.getElementById('content').innerHTML = '';
   rebuildConcepts();
   
-  // Restore view state
+  // Restore view
   if (wasOnDetail) {
     activeId = currentConcept;
     showView('detail');
