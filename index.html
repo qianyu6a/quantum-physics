@@ -400,7 +400,7 @@ function defaultState(id) {
     case 'schrodinger': return { n: 3, wellDepth: 1, timeSpeed: 1 };
     case 'dirac': return { energy: 1.5, showPair: false };
     case 'qft': return { fieldStrength: 1, excitationCount: 5 };
-    case 'feynman': return { exchangeMomentum: 1 };
+    case 'feynman': return { angle: 90 };
     case 'standard': return { highlightParticle: null };
     case 'higgs': return { couplingStrength: 1 };
     case 'entanglement': return { measured: false, angle: 0 };
@@ -538,7 +538,9 @@ function buildControls(id, container) {
       div.innerHTML = `
         <label>光子能量 E</label><input type="range" min="1" max="5" step="0.5" value="${s.energy}" id="ctrl-${id}-energy">
         <span class="val" id="val-${id}-energy">${s.energy} MeV</span>
-        <button class="btn" id="ctrl-${id}-pair">⚡ 产生对粒子</button>
+        <button class="btn" id="ctrl-${id}-pair">⚡ 产生粒子对</button>
+        <button class="btn" id="ctrl-${id}-annih">☄️ 湮灭演示</button>
+        <span style="font-size:10px;color:var(--muted)">点击画面 = 发射光子</span>
       `;
       break;
     case 'string':
@@ -546,6 +548,14 @@ function buildControls(id, container) {
         <label>振动模式</label><input type="range" min="1" max="5" value="${s.mode}" id="ctrl-${id}-mode">
         <span class="val" id="val-${id}-mode">n=${s.mode}</span>
         <span style="font-size:10px;color:var(--muted)">${['电子','μ子','τ子','顶夸克','希格斯'][s.mode-1]||'?'}</span>
+      `;
+      break;
+    case 'feynman':
+      div.innerHTML = `
+        <label>散射角 θ</label><input type="range" min="10" max="170" value="${s.angle}" id="ctrl-${id}-angle">
+        <span class="val" id="val-${id}-angle">${s.angle}°</span>
+        <button class="btn" id="ctrl-${id}-burst">⚡ 虚光子脉冲</button>
+        <span style="font-size:10px;color:var(--muted)">点击画面也可发射</span>
       `;
       break;
     default:
@@ -592,6 +602,9 @@ function handlePress(id, x, y) {
   if (id === 'qcd') {
     s.pullStrength = 1;
   }
+  if (id === 'debroglie') s.manualFire = true;
+  if (id === 'dirac') s.fireNow = 'produce';
+  if (id === 'feynman') s.burst = 90;
 }
 
 function handleMove(id, x, y) {
@@ -711,13 +724,32 @@ function gradientLine(ctx, x1, y1, x2, y2, c1, c2) {
 // ═══════════════════════════════════════
 
 function drawPlanck(ctx, w, h, t, st) {
-  const cx = w/2, cy = h/2;
-  const freq = st?.freq || 5;
+  const cx = w/2, freq = st?.freq || 5;
+  
+  // Compute Planck curve values first
+  const points = [];
+  let maxPlanck = 0, maxRJ = 0;
+  for (let v = 1; v <= 15; v += 0.2) {
+    const rj = v * v;
+    const pk = Math.pow(v, 3) / (Math.exp(v/freq) - 1);
+    points.push({ v, rj, pk });
+    if (rj > maxRJ) maxRJ = rj;
+    if (pk > maxPlanck) maxPlanck = pk;
+  }
+  
+  // Scale: Planck peak reaches ~60% of graph height
+  const scale = (h * 0.6) / Math.max(maxPlanck, 1);
+  const rjScale = (h * 0.6) / Math.max(maxRJ, 1) * 0.4;
   
   // Draw axes
   ctx.strokeStyle = 'rgba(136,153,170,0.3)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(w*0.08, h*0.15); ctx.lineTo(w*0.08, h*0.85); ctx.lineTo(w*0.92, h*0.85); ctx.stroke();
+  ctx.fillStyle = '#8899aa';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('频率 ν →', w*0.5, h*0.92);
+  ctx.fillText('能量密度', w*0.04, h*0.5);
   
   // Classical Rayleigh-Jeans (UV catastrophe!)
   if (st?.showClassical !== false) {
@@ -725,46 +757,43 @@ function drawPlanck(ctx, w, h, t, st) {
     ctx.lineWidth = 2;
     ctx.setLineDash([4,3]);
     ctx.shadowColor = '#f72585';
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 6;
     ctx.beginPath();
-    for (let v = 1; v <= 15; v += 0.2) {
-      const x = w*0.08 + (v/15) * w*0.84;
-      const intensity = v * v * 0.12;
-      const y = h*0.85 - Math.min(intensity * h, h*0.65);
-      if (v === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
+    points.forEach((p, i) => {
+      const x = w*0.08 + (p.v/15)*w*0.84;
+      const y = h*0.85 - p.rj * rjScale;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
     ctx.stroke();
     ctx.shadowBlur = 0;
     ctx.setLineDash([]);
-    glowText(ctx, '瑞利-金斯 (→∞紫外灾难!)', w*0.65, h*0.22, '#f72585', 10);
+    glowText(ctx, '瑞利-金斯 (紫外发散!)', w*0.68, h*0.2, '#f72585', 10);
   }
   
-  // Planck curve — peaks then falls
+  // Planck curve
   ctx.strokeStyle = '#00b4d8';
   ctx.lineWidth = 3;
   ctx.shadowColor = '#00b4d8';
   ctx.shadowBlur = 10;
   ctx.beginPath();
-  for (let v = 1; v <= 15; v += 0.2) {
-    const x = w*0.08 + (v/15) * w*0.84;
-    const planck = Math.pow(v, 3) / (Math.exp(v/freq) - 1) * 0.3;
-    const y = h*0.85 - Math.min(planck * h, h*0.65);
-    if (v === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  }
+  points.forEach((p, i) => {
+    const x = w*0.08 + (p.v/15)*w*0.84;
+    const y = h*0.85 - p.pk * scale;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
   ctx.stroke();
   ctx.shadowBlur = 0;
   
-  // Frequency marker
-  const mx = w*0.08 + (freq/15)*w*0.84;
+  // Peak marker
+  const peakV = freq * 2.82; // Wien's displacement law approximation
+  const peakX = w*0.08 + Math.min(peakV/15, 1)*w*0.84;
+  const peakY = h*0.85 - Math.pow(peakV,3)/(Math.exp(peakV/freq)-1)*scale;
   ctx.fillStyle = '#f4a261';
-  ctx.beginPath(); ctx.arc(mx, h*0.85 - Math.pow(freq,3)/(Math.exp(1)-1)*0.3*h, 6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(peakX, Math.max(h*0.15, peakY), 6, 0, Math.PI*2); ctx.fill();
   
-  glowText(ctx, '普朗克公式 — E = hν', w*0.35, h*0.18, '#00b4d8', 14);
-  glowText(ctx, `ν = ${freq}`, mx, h*0.82, '#f4a261', 10);
-  ctx.fillStyle = '#8899aa';
-  ctx.font = '10px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillText('频率 ν →', w*0.5, h*0.92);
+  glowText(ctx, '普朗克: 能量量子化 E=hν', w*0.35, h*0.14, '#00b4d8', 14);
+  glowText(ctx, `ν₀ = ${freq}`, w*0.15, h*0.82, '#f4a261', 10);
+  glowText(ctx, '峰值 →', peakX - 25, peakY - 12, '#f4a261', 10);
 }
 
 function drawPhotoelectric(ctx, w, h, t, st) {
@@ -938,7 +967,7 @@ function drawUncertainty(ctx, w, h, t, st) {
   glowText(ctx, `位置不确定度: ~${spread.toFixed(0)}`, cx+120, h*0.45, '#00b4d8', 10);
 }
 
-function drawSchrodinger(ctx, w, h, t) {
+function drawSchrodinger(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // Potential well
@@ -993,7 +1022,7 @@ function drawSchrodinger(ctx, w, h, t) {
   glowText(ctx, '薛定谔方程: iℏ ∂ψ/∂t = Ĥψ', cx, h*0.12, '#00b4d8', 15);
 }
 
-function drawDirac(ctx, w, h, t) {
+function drawDirac(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // Dirac sea — sea of negative energy
@@ -1056,7 +1085,7 @@ function drawDirac(ctx, w, h, t) {
   glowText(ctx, '一个方程，一个镜像世界', cx, h*0.9, '#8899aa', 12);
 }
 
-function drawQFT(ctx, w, h, t) {
+function drawQFT(ctx, w, h, t, st) {
   // Ocean of field with ripples
   const cx = w/2;
   const seaLevel = h*0.55;
@@ -1101,7 +1130,7 @@ function drawQFT(ctx, w, h, t) {
   glowText(ctx, '量子场论 (QFT)', cx, h*0.85, '#8899aa', 13);
 }
 
-function drawFeynman(ctx, w, h, t) {
+function drawFeynman(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // Electron lines
@@ -1143,7 +1172,7 @@ function drawFeynman(ctx, w, h, t) {
   glowText(ctx, '费曼图: 两个电子交换一个光子', cx, h*0.92, '#8899aa', 13);
 }
 
-function drawStandard(ctx, w, h, t) {
+function drawStandard(ctx, w, h, t, st) {
   const cx = w/2;
   const cols = 4;
   const cellW = w / (cols + 1);
@@ -1218,7 +1247,7 @@ function drawStandard(ctx, w, h, t) {
   glowText(ctx, '6夸克 + 6轻子 + 4力载体 + 1希格斯', cx, h*0.92, '#8899aa', 12);
 }
 
-function drawHiggs(ctx, w, h, t) {
+function drawHiggs(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // Higgs field — background "molasses"
@@ -1271,7 +1300,7 @@ function drawHiggs(ctx, w, h, t) {
   glowText(ctx, '阻力 = 质量', cx, h*0.92, '#8899aa', 13);
 }
 
-function drawEntanglement(ctx, w, h, t) {
+function drawEntanglement(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // Two entangled particles
@@ -1325,7 +1354,7 @@ function drawEntanglement(ctx, w, h, t) {
   glowText(ctx, '不管隔多远——这是量子纠缠', cx, h*0.9, '#8899aa', 13);
 }
 
-function drawQCD(ctx, w, h, t) {
+function drawQCD(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // Three quarks in a proton
@@ -1381,7 +1410,7 @@ function drawQCD(ctx, w, h, t) {
   glowText(ctx, '夸克禁闭——永远看不到自由的夸克', cx, h*0.9, '#8899aa', 12);
 }
 
-function drawString(ctx, w, h, t) {
+function drawString(ctx, w, h, t, st) {
   const cx = w/2, cy = h/2;
   
   // A single string vibrating in different modes
