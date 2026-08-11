@@ -1727,6 +1727,85 @@ function drawQC(ctx, w, h, t, st) {
 // Init first canvas
 // ═══════════════════════════════════════
 // initCanvas handled by showConcept now
+
+// ═══════════════════════════════════════
+// View Switching
+// ═══════════════════════════════════════
+let currentLang = 'zh';
+let isDark = true;
+
+function showView(view) {
+  document.getElementById('home-view').classList.toggle('active', view === 'home');
+  document.getElementById('detail-view').classList.toggle('active', view === 'detail');
+  document.getElementById('navHome').classList.toggle('active', view === 'home');
+  document.getElementById('navDetail').classList.toggle('active', view === 'detail');
+  if (view === 'detail') {
+    if (!activeId) activeId = 'planck';
+    setTimeout(() => { showConcept(activeId); }, 100);
+  }
+  window.scrollTo(0, 0);
+}
+
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.classList.toggle('light', !isDark);
+  document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
+  localStorage.setItem('quantum-theme', isDark ? 'dark' : 'light');
+}
+if (localStorage.getItem('quantum-theme') === 'light') { isDark = false; toggleTheme(); }
+
+function filterCards() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let found = false;
+  document.querySelectorAll('.concept-card').forEach(card => {
+    const title = (card.dataset.title || '').toLowerCase();
+    const desc = (card.dataset.desc || '').toLowerCase();
+    const match = !q || title.includes(q) || desc.includes(q);
+    card.classList.toggle('hidden', !match);
+    if (match) found = true;
+  });
+  document.getElementById('noResults').style.display = found ? 'none' : 'block';
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'zh' ? 'en' : 'zh';
+  document.getElementById('langBtn').textContent = currentLang === 'zh' ? 'EN' : '中文';
+}
+let translations = null;
+
+function buildHomePage() {
+  const grid = document.getElementById('cardsGrid');
+  concepts.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'concept-card';
+    card.dataset.title = c.title;
+    card.dataset.desc = c.tagline;
+    card.innerHTML = `<div class="card-icon">${c.icon}</div><div class="card-num">${c.year}</div><div class="card-title">${c.num}. ${c.title}</div><div class="card-desc">${c.tagline}</div>`;
+    card.onclick = () => { activeId = c.id; showView('detail'); };
+    grid.appendChild(card);
+  });
+  const timeline = document.getElementById('timeline');
+  const events = [
+    {year:'1895', text:'伦琴发现X射线——人类第一次看到体内的骨骼。这不仅是一项医学革命，更标志着物理学开始深入原子世界。'},
+    {year:'1900', text:'普朗克引入能量量子化概念，E=hν。"这是绝望之举"——他自己都不信。量子物理的诞生日。'},
+    {year:'1905', text:'爱因斯坦奇迹年：光电效应、布朗运动、狭义相对论。26岁的专利局职员改写了物理学。'},
+    {year:'1911-1913', text:'卢瑟福发现原子核，玻尔提出量子轨道模型。电子"住楼房"——只允许特定轨道。'},
+    {year:'1924-1927', text:'量子力学的黄金时代：波粒二象性、不确定性原理、薛定谔方程。哥本哈根争论奠定量子哲学基础。'},
+    {year:'1928-1932', text:'狄拉克方程统一量子力学和相对论，预言反物质。安德森发现正电子——数学之美被实验证实。'},
+    {year:'1940s-1950s', text:'QED完成：费曼、施温格、朝永解决"无穷大"问题。人类最精确的物理理论诞生。'},
+    {year:'1960s-1970s', text:'标准模型成形：夸克模型、电弱统一理论。所有预言粒子被逐一发现。'},
+    {year:'1964-2012', text:'希格斯机制预言赋予万物质量的场。论文曾被拒，他等了48年。2012年CERN发布会，83岁的他哭了。'},
+    {year:'1980s-1990s', text:'量子纠缠违反贝尔不等式——爱因斯坦错了。量子计算从费曼构想走向实验。'},
+    {year:'2000s-2020s', text:'量子技术爆发：墨子号量子卫星、Google量子霸权、IBM千比特处理器。量子计算机走向现实。'}
+  ];
+  events.forEach(e => {
+    const item = document.createElement('div');
+    item.className = 'timeline-item';
+    item.innerHTML = `<div class="timeline-year">${e.year}</div><div class="timeline-text">${e.text}</div>`;
+    timeline.appendChild(item);
+  });
+}
+document.addEventListener('DOMContentLoaded', buildHomePage);
 </script>
 
 </div>
