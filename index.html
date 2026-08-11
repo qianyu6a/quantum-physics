@@ -242,10 +242,11 @@ body.light .canvas-container { background: var(--surface); }
 /* Mobile topnav */
 @media (max-width:768px) {
   body { overflow-y:auto; overflow-x:hidden; }
+  #home-view.active { height:auto; overflow-y:visible; }
   .home-hero h1 { font-size:24px; }
   .cards-grid { grid-template-columns:1fr; }
   .timeline-section { padding:20px 12px; }
-  #detail-view.active { flex-direction:column; }
+  #detail-view.active { flex-direction:column; height:100vh; overflow:hidden; }
   #detail-view.active .sidebar { width:100%; min-width:100%; max-height:50px; overflow:hidden; }
   #detail-view.active .content { flex:1; overflow-y:auto; }
 }
